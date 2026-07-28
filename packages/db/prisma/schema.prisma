@@ -1,0 +1,45 @@
+// mou7asib — Prisma schema
+//
+// D0 (stack spike) scope only. These two models exist to prove that the
+// Node 24 → Prisma 7.9 → TypeScript 7.0 → Next 16.2 → React 19.2 chain works
+// end to end, and specifically that a Decimal(19,4) money column survives the
+// round trip. They are NOT the domain model.
+//
+// They deliberately follow the rules that are expensive to retrofit, so that
+// D2 can be built on this foundation rather than beside it:
+//   - CLAUDE.md §2 rule 1  — money is Decimal(19,4), never a float
+//   - CLAUDE.md §8.1       — every tenant-owned table has a non-nullable,
+//                            indexed tenantId
+//   - CLAUDE.md §5.7       — timestamps stored in UTC (timestamptz)
+
+generator client {
+  provider = "prisma-client"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Tenant {
+  id        String       @id @default(uuid(7)) @db.Uuid
+  name      String
+  createdAt DateTime     @default(now()) @db.Timestamptz(6)
+  checks    StackCheck[]
+
+  @@map("tenants")
+}
+
+/// D0 scaffolding — delete once D2 introduces real document models.
+model StackCheck {
+  id       String   @id @default(uuid(7)) @db.Uuid
+  tenantId String   @db.Uuid
+  tenant   Tenant   @relation(fields: [tenantId], references: [id])
+  label    String
+  /// CLAUDE.md §2 rule 1 / §6 — money is always Decimal(19,4).
+  amount   Decimal  @db.Decimal(19, 4)
+  bookedAt DateTime @default(now()) @db.Timestamptz(6)
+
+  @@index([tenantId])
+  @@map("stack_checks")
+}

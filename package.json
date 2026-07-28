@@ -1,0 +1,26 @@
+{
+  "name": "mou7asib",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Web-based accounting SaaS for Moroccan small businesses (TPE/PME)",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "engines": {
+    "node": ">=24.0.0"
+  },
+  "scripts": {
+    "build": "npm run build --workspace @mou7asib/web",
+    "dev": "npm run dev --workspace @mou7asib/web",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "db:generate": "npm run generate --workspace @mou7asib/db",
+    "db:migrate": "npm run migrate --workspace @mou7asib/db",
+    "db:seed": "npm run seed --workspace @mou7asib/db"
+  },
+  "allowScripts": {
+    "@prisma/engines@7.9.0": true,
+    "prisma@7.9.0": true,
+    "sharp@0.34.5": true
+  }
+}
