@@ -16,7 +16,9 @@
     "typecheck": "npm run typecheck --workspaces --if-present",
     "db:generate": "npm run generate --workspace @mou7asib/db",
     "db:migrate": "npm run migrate --workspace @mou7asib/db",
-    "db:seed": "npm run seed --workspace @mou7asib/db"
+    "db:seed": "npm run seed --workspace @mou7asib/db",
+    "db:up": "docker compose up -d --wait",
+    "db:down": "docker compose down"
   },
   "allowScripts": {
     "@prisma/engines@7.9.0": true,
