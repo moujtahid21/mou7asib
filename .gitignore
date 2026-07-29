@@ -31,3 +31,6 @@ Thumbs.db
 # logs
 *.log
 npm-debug.log*
+
+# stray local files that are not project content
+/7C56v1M1.zip
