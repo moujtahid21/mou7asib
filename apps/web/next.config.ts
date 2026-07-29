@@ -4,7 +4,10 @@ import type { NextConfig } from "next";
 
 // Local dev only: read the repo-root .env. In production the platform supplies
 // the environment, and this call finds no file and does nothing.
-loadEnv({ path: fileURLToPath(new URL("../../.env", import.meta.url)) });
+loadEnv({
+  path: fileURLToPath(new URL("../../.env", import.meta.url)),
+  quiet: true,
+});
 
 const nextConfig: NextConfig = {
   // @mou7asib/db ships TypeScript source (Prisma 7 generates .ts), so Next

@@ -5,7 +5,10 @@ import { defineConfig } from "prisma/config";
 // One .env at the repo root is the single source of truth for local secrets,
 // resolved from this file's own location rather than the current working
 // directory so it does not matter where the CLI is invoked from.
-loadEnv({ path: fileURLToPath(new URL("../../.env", import.meta.url)) });
+loadEnv({
+  path: fileURLToPath(new URL("../../.env", import.meta.url)),
+  quiet: true,
+});
 
 // Prisma 7 moved the datasource URL out of schema.prisma and into this file.
 // The URL is read from the environment and never committed (CLAUDE.md §8.5).

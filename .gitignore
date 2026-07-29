@@ -22,6 +22,9 @@ packages/db/generated/
 # uploads — CLAUDE.md §14
 uploads/
 
+# vercel
+.vercel
+
 # editor / os
 .idea/
 .vscode/
