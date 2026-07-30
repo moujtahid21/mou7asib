@@ -14,6 +14,7 @@ import json
 import time
 from pathlib import Path
 
+import httpx
 from pydantic import ValidationError
 
 from extraction_harness.ollama_client import chat
@@ -63,7 +64,35 @@ def extract_document(
             messages = build_messages_for_image(image_b64, validation_error)
 
         start = time.monotonic()
-        result = chat(messages, model=model)
+        try:
+            result = chat(messages, model=model)
+        except httpx.HTTPError as exc:
+            # A transport/HTTP-level failure (context overflow, connection drop,
+            # timeout, ...) is a failed attempt for THIS document, not a reason to
+            # crash the whole batch — one bad document must not cost every other
+            # document its result. No token/duration data from Ollama in this case;
+            # wall-clock time is the only measurement available.
+            wall_clock_ms = int((time.monotonic() - start) * 1000)
+            cost = CostRecord(
+                tenant_id=tenant_id,
+                document_id=document_id,
+                provider="ollama",
+                model=model,
+                prompt_version=prompt_version,
+                input_tokens=0,
+                output_tokens=0,
+                cost_minor_units=0,
+                compute_ms=wall_clock_ms,
+                latency_ms=wall_clock_ms,
+                attempt_number=attempt_number,
+                path=path,
+            )
+            validation_error = f"HTTP error calling Ollama: {exc}"
+            attempts.append(ExtractionAttempt(extraction=None, cost=cost, raw_response=str(exc)))
+            if attempt_number < max_attempts:
+                time.sleep(BACKOFF_SECONDS * attempt_number)
+            continue
+
         wall_clock_ms = int((time.monotonic() - start) * 1000)
 
         cost = CostRecord(

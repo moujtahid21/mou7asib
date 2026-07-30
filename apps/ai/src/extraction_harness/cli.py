@@ -46,7 +46,7 @@ def cmd_run(args: argparse.Namespace) -> None:
     if not pairs:
         raise SystemExit(f"No document/.ground_truth.json pairs found under {input_dir}")
 
-    run_dir = Path("apps/ai/runs") / args.run_id
+    run_dir = Path("runs") / args.run_id
     run_dir.mkdir(parents=True, exist_ok=True)
     cost_log_path = run_dir / "cost_log.jsonl"
     results_path = run_dir / "results.jsonl"
@@ -84,6 +84,9 @@ def cmd_run(args: argparse.Namespace) -> None:
                         "path": attempts[-1].cost.path if attempts else None,
                         "attempts": len(attempts),
                         "extraction": final_extraction.model_dump(mode="json") if final_extraction else None,
+                        # Kept on failure so a flagged (extraction=None) document is
+                        # debuggable after the fact, not just known-to-have-failed.
+                        "final_raw_response": attempts[-1].raw_response if attempts else None,
                         "score": score.model_dump(mode="json"),
                         "arithmetic_ok": arithmetic_ok,
                     }
@@ -112,7 +115,7 @@ def cmd_run(args: argparse.Namespace) -> None:
 
 
 def cmd_score(args: argparse.Namespace) -> None:
-    results_path = Path("apps/ai/runs") / args.run_id / "results.jsonl"
+    results_path = Path("runs") / args.run_id / "results.jsonl"
     if not results_path.exists():
         raise SystemExit(f"No results found at {results_path} — run `run` first")
 
@@ -124,7 +127,7 @@ def cmd_score(args: argparse.Namespace) -> None:
             document_scores.append(DocumentScore.model_validate(record["score"]))
             arithmetic_results.append(record["arithmetic_ok"])
 
-    cost_log_path = Path("apps/ai/runs") / args.run_id / "cost_log.jsonl"
+    cost_log_path = Path("runs") / args.run_id / "cost_log.jsonl"
     cost_records = read_cost_records(cost_log_path)
 
     print(render_accuracy_table(document_scores, arithmetic_results))

@@ -10,7 +10,7 @@ from datetime import date
 from decimal import Decimal
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, field_validator
 
 
 class TvaLine(BaseModel):
@@ -18,9 +18,23 @@ class TvaLine(BaseModel):
 
     model_config = ConfigDict(frozen=True)
 
-    rate: Decimal
+    rate: Decimal  # decimal fraction, e.g. 0.20 for 20% — never 20
     base_ht: Decimal
     tva_amount: Decimal
+
+    @field_validator("rate")
+    @classmethod
+    def _rate_is_a_fraction_not_a_percentage(cls, value: Decimal) -> Decimal:
+        # Moroccan TVA rates in use are 0%, 7%, 10%, 14%, 20% (CLAUDE.md §5.3) — as
+        # fractions, always <= 0.20. A model that returns "20" instead of "0.20" fails
+        # here and the retry loop (extract.py) feeds this error back for self-correction,
+        # rather than silently accepting a rate 100x too large.
+        if value > Decimal(1):
+            raise ValueError(
+                f"rate must be a decimal fraction (e.g. 0.20 for 20%), got {value} "
+                "which looks like a percentage — divide by 100"
+            )
+        return value
 
 
 class InvoiceExtraction(BaseModel):
