@@ -1,0 +1,28 @@
+{
+  "invoice_number": "FA-2026-0010",
+  "invoice_date": "2026-02-01",
+  "due_date": "2026-03-03",
+  "supplier_name": "Materiaux du Nord SARL",
+  "supplier_ice": "010011223000099",
+  "supplier_if": "10011223",
+  "customer_name": "Chantier Bab Marrakech",
+  "customer_ice": "011022334000100",
+  "customer_if": "11022334",
+  "currency": "MAD",
+  "total_ht": "3200.00",
+  "tva_lines": [
+    {
+      "rate": "0.20",
+      "base_ht": "2200.00",
+      "tva_amount": "440.00"
+    },
+    {
+      "rate": "0.14",
+      "base_ht": "1000.00",
+      "tva_amount": "140.00"
+    }
+  ],
+  "total_tva": "580.00",
+  "total_ttc": "3780.00",
+  "payment_terms": "90 jours date de facture, virement bancaire uniquement"
+}

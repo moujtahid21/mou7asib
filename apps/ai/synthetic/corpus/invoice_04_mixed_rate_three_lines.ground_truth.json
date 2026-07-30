@@ -1,0 +1,33 @@
+{
+  "invoice_number": "FA-2026-0004",
+  "invoice_date": "2026-01-18",
+  "due_date": "2026-02-17",
+  "supplier_name": "Fournitures Generales du Sud",
+  "supplier_ice": "003344556000078",
+  "supplier_if": "33445566",
+  "customer_name": "Cooperative Argania",
+  "customer_ice": "007654321000088",
+  "customer_if": "77665544",
+  "currency": "MAD",
+  "total_ht": "2200.00",
+  "tva_lines": [
+    {
+      "rate": "0.20",
+      "base_ht": "1000.00",
+      "tva_amount": "200.00"
+    },
+    {
+      "rate": "0.10",
+      "base_ht": "800.00",
+      "tva_amount": "80.00"
+    },
+    {
+      "rate": "0.07",
+      "base_ht": "400.00",
+      "tva_amount": "28.00"
+    }
+  ],
+  "total_tva": "308.00",
+  "total_ttc": "2508.00",
+  "payment_terms": "A reception"
+}

@@ -1,0 +1,23 @@
+{
+  "invoice_number": "FA-2026-0009",
+  "invoice_date": "2026-01-29",
+  "due_date": "2026-02-28",
+  "supplier_name": "Garage Moderne",
+  "supplier_ice": "009900112000088",
+  "supplier_if": "99001122",
+  "customer_name": "Mr. Youssef Idrissi",
+  "customer_ice": null,
+  "customer_if": null,
+  "currency": "MAD",
+  "total_ht": "950.00",
+  "tva_lines": [
+    {
+      "rate": "0.20",
+      "base_ht": "950.00",
+      "tva_amount": "190.00"
+    }
+  ],
+  "total_tva": "190.00",
+  "total_ttc": "1140.00",
+  "payment_terms": "Comptant"
+}

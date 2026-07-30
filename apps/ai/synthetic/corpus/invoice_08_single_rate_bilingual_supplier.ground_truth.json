@@ -1,0 +1,23 @@
+{
+  "invoice_number": "FA-2026-0008",
+  "invoice_date": "2026-01-27",
+  "due_date": "2026-02-26",
+  "supplier_name": "Societe Al Baraka",
+  "supplier_ice": "008899001000066",
+  "supplier_if": "88990011",
+  "customer_name": "Hanout Bab Doukkala",
+  "customer_ice": "002211009000077",
+  "customer_if": "22110099",
+  "currency": "MAD",
+  "total_ht": "650.00",
+  "tva_lines": [
+    {
+      "rate": "0.20",
+      "base_ht": "650.00",
+      "tva_amount": "130.00"
+    }
+  ],
+  "total_tva": "130.00",
+  "total_ttc": "780.00",
+  "payment_terms": "30 jours"
+}

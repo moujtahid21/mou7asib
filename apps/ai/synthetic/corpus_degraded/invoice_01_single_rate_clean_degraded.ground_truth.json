@@ -1,0 +1,23 @@
+{
+  "invoice_number": "FA-2026-0001",
+  "invoice_date": "2026-01-10",
+  "due_date": "2026-02-09",
+  "supplier_name": "Atelier El Amrani",
+  "supplier_ice": "001234567000045",
+  "supplier_if": "12345678",
+  "customer_name": "Client Test SARL",
+  "customer_ice": "009876543000012",
+  "customer_if": "87654321",
+  "currency": "MAD",
+  "total_ht": "1000.00",
+  "tva_lines": [
+    {
+      "rate": "0.20",
+      "base_ht": "1000.00",
+      "tva_amount": "200.00"
+    }
+  ],
+  "total_tva": "200.00",
+  "total_ttc": "1200.00",
+  "payment_terms": "30 jours"
+}

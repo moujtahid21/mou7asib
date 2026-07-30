@@ -1,0 +1,28 @@
+{
+  "invoice_number": "FA-2026-0012",
+  "invoice_date": "2026-02-05",
+  "due_date": "2026-03-07",
+  "supplier_name": "Distribution Agricole du Souss",
+  "supplier_ice": "014055667000033",
+  "supplier_if": "14055667",
+  "customer_name": "Cooperative Agricole Taroudant",
+  "customer_ice": "015066778000044",
+  "customer_if": "15066778",
+  "currency": "MAD",
+  "total_ht": "1900.00",
+  "tva_lines": [
+    {
+      "rate": "0.14",
+      "base_ht": "1200.00",
+      "tva_amount": "168.00"
+    },
+    {
+      "rate": "0.07",
+      "base_ht": "700.00",
+      "tva_amount": "49.00"
+    }
+  ],
+  "total_tva": "217.00",
+  "total_ttc": "2117.00",
+  "payment_terms": "30 jours"
+}

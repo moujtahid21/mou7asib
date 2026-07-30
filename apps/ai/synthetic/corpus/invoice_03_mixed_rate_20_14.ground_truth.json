@@ -1,0 +1,28 @@
+{
+  "invoice_number": "FA-2026-0003",
+  "invoice_date": "2026-01-15",
+  "due_date": "2026-02-14",
+  "supplier_name": "Import Export Chraibi",
+  "supplier_ice": "002233445000067",
+  "supplier_if": "22334455",
+  "customer_name": "Societe Alpha SARL",
+  "customer_ice": "008765432000099",
+  "customer_if": "88776655",
+  "currency": "MAD",
+  "total_ht": "1500.00",
+  "tva_lines": [
+    {
+      "rate": "0.20",
+      "base_ht": "1000.00",
+      "tva_amount": "200.00"
+    },
+    {
+      "rate": "0.14",
+      "base_ht": "500.00",
+      "tva_amount": "70.00"
+    }
+  ],
+  "total_tva": "270.00",
+  "total_ttc": "1770.00",
+  "payment_terms": "45 jours fin de mois"
+}

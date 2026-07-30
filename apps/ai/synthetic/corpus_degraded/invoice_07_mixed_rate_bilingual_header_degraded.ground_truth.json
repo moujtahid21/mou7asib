@@ -1,0 +1,28 @@
+{
+  "invoice_number": "FA-2026-0007",
+  "invoice_date": "2026-01-25",
+  "due_date": "2026-02-24",
+  "supplier_name": "Riad Dar Zaytoune",
+  "supplier_ice": "007788990000044",
+  "supplier_if": "77889900",
+  "customer_name": "Voyages Atlas SARL",
+  "customer_ice": "003322110000055",
+  "customer_if": "33221100",
+  "currency": "MAD",
+  "total_ht": "1800.00",
+  "tva_lines": [
+    {
+      "rate": "0.20",
+      "base_ht": "1200.00",
+      "tva_amount": "240.00"
+    },
+    {
+      "rate": "0.14",
+      "base_ht": "600.00",
+      "tva_amount": "84.00"
+    }
+  ],
+  "total_tva": "324.00",
+  "total_ttc": "2124.00",
+  "payment_terms": "60 jours"
+}

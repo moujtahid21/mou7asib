@@ -25,6 +25,12 @@ uploads/
 # vercel
 .vercel
 
+# python (apps/ai)
+apps/ai/.venv/
+**/__pycache__/
+*.pyc
+apps/ai/runs/
+
 # editor / os
 .idea/
 .vscode/

@@ -1,0 +1,23 @@
+{
+  "invoice_number": "FA-2026-0005",
+  "invoice_date": "2026-01-20",
+  "due_date": "2026-02-19",
+  "supplier_name": "Transport Rapide SARL",
+  "supplier_ice": "001-234567-000099",
+  "supplier_if": "99887766",
+  "customer_name": "Cafe Al Manzah",
+  "customer_ice": "004-455667-000011",
+  "customer_if": null,
+  "currency": "MAD",
+  "total_ht": "800.00",
+  "tva_lines": [
+    {
+      "rate": "0.10",
+      "base_ht": "800.00",
+      "tva_amount": "80.00"
+    }
+  ],
+  "total_tva": "80.00",
+  "total_ttc": "880.00",
+  "payment_terms": "Comptant"
+}

@@ -1,0 +1,23 @@
+{
+  "invoice_number": "FA-2026-0002",
+  "invoice_date": "2026-01-12",
+  "due_date": null,
+  "supplier_name": "Menuiserie Bennani",
+  "supplier_ice": "001111222000033",
+  "supplier_if": "11112222",
+  "customer_name": "Particulier",
+  "customer_ice": null,
+  "customer_if": null,
+  "currency": "MAD",
+  "total_ht": "500.00",
+  "tva_lines": [
+    {
+      "rate": "0.20",
+      "base_ht": "500.00",
+      "tva_amount": "100.00"
+    }
+  ],
+  "total_tva": "100.00",
+  "total_ttc": "600.00",
+  "payment_terms": null
+}

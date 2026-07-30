@@ -1,0 +1,23 @@
+{
+  "invoice_number": "FA-2026-0011",
+  "invoice_date": "2026-02-03",
+  "due_date": null,
+  "supplier_name": "Pharmacie Al Wafa",
+  "supplier_ice": "012033445000011",
+  "supplier_if": "12033445",
+  "customer_name": "Clinique Errazi",
+  "customer_ice": "013044556000022",
+  "customer_if": "13044556",
+  "currency": "MAD",
+  "total_ht": "420.00",
+  "tva_lines": [
+    {
+      "rate": "0.20",
+      "base_ht": "420.00",
+      "tva_amount": "84.00"
+    }
+  ],
+  "total_tva": "84.00",
+  "total_ttc": "504.00",
+  "payment_terms": "7 jours"
+}
