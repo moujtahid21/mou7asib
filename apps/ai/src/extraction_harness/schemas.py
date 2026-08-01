@@ -89,3 +89,35 @@ class ExtractionAttempt(BaseModel):
     extraction: InvoiceExtraction | None
     cost: CostRecord
     raw_response: str
+
+
+class BoundingBox(BaseModel):
+    """0-1 fractions of the document's stored image frame."""
+
+    model_config = ConfigDict(frozen=True)
+
+    x: float
+    y: float
+    width: float
+    height: float
+
+
+class GroundedField(BaseModel):
+    """One row to persist to extracted_fields (D2) — the grounding stage's output.
+
+    field_name matches InvoiceExtraction's attribute names literally.
+    group_name/group_index are set for tva_lines entries, null for scalars.
+    confidence is always computed (fuzzy-match score, OCR word confidence,
+    arithmetic pass/fail — see grounding.py), never the model's own
+    self-reported confidence, which is poorly calibrated by nature.
+    """
+
+    field_name: str
+    group_name: str | None = None
+    group_index: int | None = None
+    field_type: Literal["string", "date", "decimal"]
+    value_text: str | None = None
+    value_decimal: Decimal | None = None
+    confidence: float
+    page_number: int = 1
+    bounding_box: BoundingBox | None = None

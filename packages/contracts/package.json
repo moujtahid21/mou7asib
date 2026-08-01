@@ -1,0 +1,9 @@
+{
+  "name": "@mou7asib/contracts",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Field metadata shared across the apps/web <-> apps/ai boundary (single source of truth, not mirrored)",
+  "exports": {
+    "./invoice-fields.json": "./invoice-fields.json"
+  }
+}

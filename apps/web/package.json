@@ -2,6 +2,7 @@
   "name": "@mou7asib/web",
   "version": "0.0.0",
   "private": true,
+  "type": "module",
   "scripts": {
     "dev": "next dev",
     "build": "next build",
@@ -9,13 +10,19 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@mou7asib/contracts": "*",
     "@mou7asib/db": "*",
+    "clamscan": "2.4.0",
+    "file-type": "22.0.1",
     "next": "16.2.12",
     "react": "19.2.8",
-    "react-dom": "19.2.8"
+    "react-dom": "19.2.8",
+    "sharp": "0.35.3",
+    "zod": "4.4.3"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "4.3.3",
+    "@types/clamscan": "2.4.1",
     "@types/node": "24.13.3",
     "@types/react": "19.2.17",
     "@types/react-dom": "19.2.3",

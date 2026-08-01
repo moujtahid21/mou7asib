@@ -1,0 +1,25 @@
+{
+  "scalarFields": [
+    { "name": "invoice_number", "type": "string", "labelFr": "Numéro de facture" },
+    { "name": "invoice_date", "type": "date", "labelFr": "Date de facture" },
+    { "name": "due_date", "type": "date", "labelFr": "Date d'échéance" },
+    { "name": "supplier_name", "type": "string", "labelFr": "Nom du fournisseur" },
+    { "name": "supplier_ice", "type": "string", "labelFr": "ICE fournisseur" },
+    { "name": "supplier_if", "type": "string", "labelFr": "IF fournisseur" },
+    { "name": "customer_name", "type": "string", "labelFr": "Nom du client" },
+    { "name": "customer_ice", "type": "string", "labelFr": "ICE client" },
+    { "name": "customer_if", "type": "string", "labelFr": "IF client" },
+    { "name": "currency", "type": "string", "labelFr": "Devise" },
+    { "name": "total_ht", "type": "decimal", "labelFr": "Total HT" },
+    { "name": "total_tva", "type": "decimal", "labelFr": "Total TVA" },
+    { "name": "total_ttc", "type": "decimal", "labelFr": "Total TTC" },
+    { "name": "payment_terms", "type": "string", "labelFr": "Conditions de paiement" }
+  ],
+  "groupFields": {
+    "tva_lines": [
+      { "name": "rate", "type": "decimal", "labelFr": "Taux TVA" },
+      { "name": "base_ht", "type": "decimal", "labelFr": "Base HT" },
+      { "name": "tva_amount", "type": "decimal", "labelFr": "Montant TVA" }
+    ]
+  }
+}

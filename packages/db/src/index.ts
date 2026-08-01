@@ -30,4 +30,14 @@ if (process.env["NODE_ENV"] !== "production") {
   globalForPrisma.__mou7asibPrisma = prisma;
 }
 
-export type { Tenant, StackCheck } from "../generated/prisma/client.ts";
+export type {
+  Tenant,
+  Document,
+  ExtractionJob,
+  ExtractionAttempt,
+  ExtractedField,
+  DocumentStatus,
+  JobStatus,
+  ExtractionPath,
+  ExtractedFieldType,
+} from "../generated/prisma/client.ts";

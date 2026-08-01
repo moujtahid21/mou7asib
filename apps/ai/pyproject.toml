@@ -1,17 +1,21 @@
 [project]
 name = "extraction-harness"
 version = "0.0.0"
-description = "D1 spike: extraction accuracy and cost measurement harness (docs/build-order.md S1a)"
+description = "Extraction accuracy/cost harness (D1) and the D2 extraction worker — no longer a throwaway spike as of D2"
 requires-python = ">=3.14,<3.15"
 dependencies = [
     "pydantic>=2.9,<3",
     "httpx>=0.27,<0.28",
     "pymupdf>=1.24,<2",
     "pillow>=12.0,<13",
+    "psycopg[binary]>=3.3,<4",
+    "pytesseract>=0.3,<0.4",
+    "rapidfuzz>=3.14,<4",
 ]
 
 [project.scripts]
 mou7asib-extract-harness = "extraction_harness.cli:main"
+mou7asib-extraction-worker = "extraction_harness.worker:main"
 
 [dependency-groups]
 dev = [
@@ -33,6 +37,10 @@ python_version = "3.14"
 
 [[tool.mypy.overrides]]
 module = "fitz"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "pytesseract"
 ignore_missing_imports = true
 
 [tool.ruff]

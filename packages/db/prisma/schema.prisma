@@ -1,16 +1,25 @@
 // mou7asib — Prisma schema
 //
-// D0 (stack spike) scope only. These two models exist to prove that the
-// Node 24 → Prisma 7.9 → TypeScript 7.0 → Next 16.2 → React 19.2 chain works
-// end to end, and specifically that a Decimal(19,4) money column survives the
-// round trip. They are NOT the domain model.
+// D2 domain: a tenant uploads a document (phone photo or scan), a Postgres-
+// mediated queue (ExtractionJob) hands it to the Python worker in apps/ai,
+// which extracts fields via the D1 harness and writes ExtractionAttempt +
+// ExtractedField rows back. See docs/decision-log.md D2 and the D2 plan for
+// the full rationale.
 //
-// They deliberately follow the rules that are expensive to retrofit, so that
-// D2 can be built on this foundation rather than beside it:
-//   - CLAUDE.md §2 rule 1  — money is Decimal(19,4), never a float
-//   - CLAUDE.md §8.1       — every tenant-owned table has a non-nullable,
-//                            indexed tenantId
-//   - CLAUDE.md §5.7       — timestamps stored in UTC (timestamptz)
+// Every new-in-D2 model gets an explicit @map("snake_case") on every field,
+// not just @@map on the table — apps/ai's worker writes to these tables via
+// raw psycopg SQL, not Prisma, so an unquoted camelCase identifier would
+// silently fold to lowercase under Postgres's identifier rules. This is a
+// deliberate deviation from Tenant's original convention (table-only @@map),
+// not an inconsistency: Tenant predates having a second, non-Prisma writer.
+//
+// CLAUDE.md rules this schema is built to honour from the start (ADR 0006:
+// "may not skip tenantId, Decimal(19,4), or the upload allowlist"):
+//   - §2 rule 1 / §6 — money and TVA-rate amounts are Decimal(19,4), never Float.
+//   - §8.1           — every tenant-owned table has a non-nullable, indexed tenantId.
+//   - §5.7           — timestamps stored in UTC (timestamptz).
+//   - §7.2           — bounding box / page reference stored per extracted field,
+//                      content hash stored per document for duplicate detection.
 
 generator client {
   provider = "prisma-client"
@@ -22,24 +31,210 @@ datasource db {
 }
 
 model Tenant {
-  id        String       @id @default(uuid(7)) @db.Uuid
+  id        String   @id @default(uuid(7)) @db.Uuid
   name      String
-  createdAt DateTime     @default(now()) @db.Timestamptz(6)
-  checks    StackCheck[]
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
+
+  documents          Document[]
+  extractionJobs     ExtractionJob[]
+  extractionAttempts ExtractionAttempt[]
+  extractedFields    ExtractedField[]
 
   @@map("tenants")
 }
 
-/// D0 scaffolding — delete once D2 introduces real document models.
-model StackCheck {
-  id       String   @id @default(uuid(7)) @db.Uuid
-  tenantId String   @db.Uuid
-  tenant   Tenant   @relation(fields: [tenantId], references: [id])
-  label    String
-  /// CLAUDE.md §2 rule 1 / §6 — money is always Decimal(19,4).
-  amount   Decimal  @db.Decimal(19, 4)
-  bookedAt DateTime @default(now()) @db.Timestamptz(6)
+enum DocumentStatus {
+  uploaded
+  queued
+  processing
+  extracted
+  failed
+
+  @@map("document_status")
+}
+
+model Document {
+  id       String @id @default(uuid(7)) @db.Uuid
+  tenantId String @map("tenant_id") @db.Uuid
+  tenant   Tenant @relation(fields: [tenantId], references: [id])
+
+  /// D1's document_id_for logic (sha256[:16]) — duplicate detection, CLAUDE.md §7.2.
+  contentHash       String @map("content_hash")
+  originalFilename  String @map("original_filename")
+  /// Detected via magic bytes (CLAUDE.md §8.4) — never the client-declared MIME type.
+  mimeType          String @map("mime_type")
+  byteSize          Int    @map("byte_size")
+  /// Relative to the uploads/ root, outside apps/web's public/static tree.
+  storagePath       String @map("storage_path")
+  /// Canonical frame that every ExtractedField.boundingBox is normalized against —
+  /// the post-EXIF-normalization, post-strip stored file, not any model-internal resize.
+  storedImageWidth  Int    @map("stored_image_width")
+  storedImageHeight Int    @map("stored_image_height")
+
+  status DocumentStatus @default(uploaded)
+
+  /// The winning attempt whose fields the review screen renders. A reprocess
+  /// creates a new attempt and repoints this rather than deleting history.
+  currentAttemptId String?            @unique @map("current_attempt_id") @db.Uuid
+  currentAttempt   ExtractionAttempt? @relation("DocumentCurrentAttempt", fields: [currentAttemptId], references: [id])
+
+  jobs     ExtractionJob[]
+  attempts ExtractionAttempt[] @relation("DocumentAttempts")
+  fields   ExtractedField[]
+
+  uploadedAt DateTime @default(now()) @map("uploaded_at") @db.Timestamptz(6)
+  updatedAt  DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@unique([tenantId, contentHash])
+  @@index([tenantId])
+  @@map("documents")
+}
+
+enum JobStatus {
+  queued
+  processing
+  succeeded
+  failed
+
+  @@map("job_status")
+}
+
+/// Queue mechanics, kept separate from Document's business-facing status so
+/// the two don't get tangled and so this shape survives future job types
+/// unchanged. The worker claims rows with SELECT ... FOR UPDATE SKIP LOCKED
+/// (ADR 0002's own recommended queue mechanism) — no Redis, no broker.
+model ExtractionJob {
+  id       String @id @default(uuid(7)) @db.Uuid
+  tenantId String @map("tenant_id") @db.Uuid
+  tenant   Tenant @relation(fields: [tenantId], references: [id])
+
+  documentId String   @map("document_id") @db.Uuid
+  document   Document @relation(fields: [documentId], references: [id])
+
+  status       JobStatus @default(queued)
+  attemptCount Int       @default(0) @map("attempt_count")
+  /// Set when a worker claims the row; startup crash-recovery requeues jobs
+  /// stuck `processing` past a generous ceiling (~20 min, past the measured
+  /// 500-600s worst case in D1) — simple recovery for a single worker process.
+  lockedAt     DateTime? @map("locked_at") @db.Timestamptz(6)
+  lockedBy     String?   @map("locked_by")
+  lastError    String?   @map("last_error")
+
+  createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  startedAt  DateTime? @map("started_at") @db.Timestamptz(6)
+  finishedAt DateTime? @map("finished_at") @db.Timestamptz(6)
+
+  attempts ExtractionAttempt[]
 
   @@index([tenantId])
-  @@map("stack_checks")
+  @@index([documentId])
+  @@index([status])
+  @@map("extraction_jobs")
+}
+
+enum ExtractionPath {
+  text_layer
+  ocr
+
+  @@map("extraction_path")
+}
+
+/// The CLAUDE.md §7.2 cost/audit tuple (ADR 0005's schema), persisted so the
+/// web tier can query/render it — D1 kept this in a JSONL file, which was
+/// fine for a CLI-only spike but D2 is not a throwaway.
+model ExtractionAttempt {
+  id       String        @id @default(uuid(7)) @db.Uuid
+  jobId    String        @map("job_id") @db.Uuid
+  job      ExtractionJob @relation(fields: [jobId], references: [id])
+  tenantId String        @map("tenant_id") @db.Uuid
+  tenant   Tenant        @relation(fields: [tenantId], references: [id])
+
+  documentId String   @map("document_id") @db.Uuid
+  document   Document @relation("DocumentAttempts", fields: [documentId], references: [id])
+
+  attemptNumber Int            @map("attempt_number")
+  model         String
+  promptVersion String         @map("prompt_version")
+  path          ExtractionPath
+
+  /// Whether this attempt produced a validated extraction (extraction != None
+  /// in D1's terms) — a failed attempt still gets a row, per CLAUDE.md §7.2.
+  success        Boolean
+  rawResponse    String   @map("raw_response")
+  inputTokens    Int      @map("input_tokens")
+  outputTokens   Int      @map("output_tokens")
+  /// Always 0 for local Ollama calls — recorded explicitly, never omitted.
+  costMinorUnits Int      @map("cost_minor_units")
+  computeMs      Int      @map("compute_ms")
+  latencyMs      Int      @map("latency_ms")
+  /// HT + TVA == TTC, reusing D1's scoring.py check_arithmetic — computed
+  /// independently of the model's own confidence (CLAUDE.md §7.2). Null when
+  /// there's no successful extraction to check.
+  arithmeticOk   Boolean? @map("arithmetic_ok")
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  currentForDocument Document?        @relation("DocumentCurrentAttempt")
+  extractedFields    ExtractedField[]
+
+  @@index([tenantId])
+  @@index([documentId])
+  @@map("extraction_attempts")
+}
+
+enum ExtractedFieldType {
+  string
+  date
+  decimal
+
+  @@map("extracted_field_type")
+}
+
+/// One row per independently-drillable field — normalized, not a JSON blob,
+/// per CLAUDE.md §9's indexing rule and because a future review queue needs
+/// to filter/query across fields ("every document with total_ttc confidence
+/// < 0.7"), which a blob forecloses. Only fields the model actually returned
+/// a non-null value for get a row; the review UI treats a missing row as
+/// "not extracted," which is what makes "flagged rather than guessed" visible.
+model ExtractedField {
+  id       String @id @default(uuid(7)) @db.Uuid
+  tenantId String @map("tenant_id") @db.Uuid
+  tenant   Tenant @relation(fields: [tenantId], references: [id])
+
+  documentId String   @map("document_id") @db.Uuid
+  document   Document @relation(fields: [documentId], references: [id])
+
+  attemptId String            @map("attempt_id") @db.Uuid
+  attempt   ExtractionAttempt @relation(fields: [attemptId], references: [id])
+
+  /// Matches InvoiceExtraction's Python attribute names literally, e.g.
+  /// "invoice_number", "total_ttc", "rate", "base_ht".
+  fieldName    String             @map("field_name")
+  /// groupName="tva_lines", groupIndex=0,1,2... for repeated TVA-rate groups.
+  /// Both null for scalar fields.
+  groupName    String?            @map("group_name")
+  groupIndex   Int?               @map("group_index")
+  fieldType    ExtractedFieldType @map("field_type")
+  valueText    String?            @map("value_text")
+  /// CLAUDE.md §2 rule 1 — money/rate amounts are Decimal(19,4), never Float.
+  /// Populated only for amount/rate fields; null for string/date fields.
+  valueDecimal Decimal?           @map("value_decimal") @db.Decimal(19, 4)
+  /// 0-1. Not money, so Float is fine here (CLAUDE.md rule 1 restricts money
+  /// specifically). Computed, never the model's own self-reported confidence
+  /// — see apps/ai's grounding module for how this is derived.
+  confidence   Float
+  pageNumber   Int                @default(1) @map("page_number")
+  /// {x, y, width, height} as 0-1 fractions of Document.storedImageWidth/Height.
+  /// The one deliberate exception to normalizing everything into columns: a
+  /// bounding box is never filtered or sorted on, only read out whole for
+  /// rendering. Validate its shape with Zod before trusting it client-side —
+  /// a separate process (the worker) wrote this, not Prisma itself.
+  boundingBox  Json?              @map("bounding_box")
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@index([tenantId])
+  @@index([documentId])
+  @@index([attemptId])
+  @@map("extracted_fields")
 }
