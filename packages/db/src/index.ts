@@ -41,3 +41,7 @@ export type {
   ExtractionPath,
   ExtractedFieldType,
 } from "../generated/prisma/client.ts";
+// Value export (not `export type`) — needed for Prisma.DocumentWhereInput
+// and friends, used to type shared query-fragment helpers like
+// apps/web/lib/documents.ts's tenant+deletedAt filter.
+export { Prisma } from "../generated/prisma/client.ts";

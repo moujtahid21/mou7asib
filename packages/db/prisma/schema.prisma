@@ -1,10 +1,11 @@
 // mou7asib — Prisma schema
 //
-// D2 domain: a tenant uploads a document (phone photo or scan), a Postgres-
-// mediated queue (ExtractionJob) hands it to the Python worker in apps/ai,
-// which extracts fields via the D1 harness and writes ExtractionAttempt +
-// ExtractedField rows back. See docs/decision-log.md D2 and the D2 plan for
-// the full rationale.
+// D2 domain: a tenant uploads a document (phone photo, or a PDF as of the
+// dashboard extension), a Postgres-mediated queue (ExtractionJob) hands it
+// to the Python worker in apps/ai, which extracts fields via the D1 harness
+// and writes ExtractionAttempt + ExtractedField rows back. See
+// docs/decision-log.md D2/D-13 and the D2 dashboard extension plan for the
+// full rationale.
 //
 // Every new-in-D2 model gets an explicit @map("snake_case") on every field,
 // not just @@map on the table — apps/ai's worker writes to these tables via
@@ -59,17 +60,26 @@ model Document {
   tenant   Tenant @relation(fields: [tenantId], references: [id])
 
   /// D1's document_id_for logic (sha256[:16]) — duplicate detection, CLAUDE.md §7.2.
-  contentHash       String @map("content_hash")
-  originalFilename  String @map("original_filename")
+  contentHash       String  @map("content_hash")
+  originalFilename  String  @map("original_filename")
   /// Detected via magic bytes (CLAUDE.md §8.4) — never the client-declared MIME type.
-  mimeType          String @map("mime_type")
-  byteSize          Int    @map("byte_size")
+  mimeType          String  @map("mime_type")
+  byteSize          Int     @map("byte_size")
   /// Relative to the uploads/ root, outside apps/web's public/static tree.
-  storagePath       String @map("storage_path")
+  storagePath       String  @map("storage_path")
   /// Canonical frame that every ExtractedField.boundingBox is normalized against —
-  /// the post-EXIF-normalization, post-strip stored file, not any model-internal resize.
-  storedImageWidth  Int    @map("stored_image_width")
-  storedImageHeight Int    @map("stored_image_height")
+  /// the post-EXIF-normalization, post-strip stored file, not any model-internal
+  /// resize. Nullable: for a PDF upload these are unknown at upload time (no EXIF
+  /// concept applies, no image to measure) and are filled in by the worker once
+  /// it rasterizes previewImagePath.
+  storedImageWidth  Int?    @map("stored_image_width")
+  storedImageHeight Int?    @map("stored_image_height")
+  /// Worker-rasterized first-page PNG for PDFs (PyMuPDF, proven — sharp's PDF
+  /// support depends on an unverified libvips/poppler build, the same trap as
+  /// the HEIC gotcha). Null for image uploads, where storagePath IS the
+  /// preview, and null for a PDF whose rasterization hasn't run yet or failed
+  /// (a corrupt/encrypted PDF must not abort extraction).
+  previewImagePath  String? @map("preview_image_path")
 
   status DocumentStatus @default(uploaded)
 
@@ -82,11 +92,19 @@ model Document {
   attempts ExtractionAttempt[] @relation("DocumentAttempts")
   fields   ExtractedField[]
 
-  uploadedAt DateTime @default(now()) @map("uploaded_at") @db.Timestamptz(6)
-  updatedAt  DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+  uploadedAt DateTime  @default(now()) @map("uploaded_at") @db.Timestamptz(6)
+  updatedAt  DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+  /// Soft-delete only — CLAUDE.md §9 wants this for user-facing (non-ledger)
+  /// records. The underlying file(s) are hard-deleted from disk regardless
+  /// (the most sensitive artifact, and no legal retention obligation exists
+  /// yet to block that); this column keeps metadata + an audit trail that a
+  /// deletion happened. Every query against Document must filter
+  /// deletedAt: null — see apps/web/lib/documents.ts.
+  deletedAt  DateTime? @map("deleted_at") @db.Timestamptz(6)
 
   @@unique([tenantId, contentHash])
   @@index([tenantId])
+  @@index([tenantId, status])
   @@map("documents")
 }
 
@@ -230,6 +248,18 @@ model ExtractedField {
   /// rendering. Validate its shape with Zod before trusting it client-side —
   /// a separate process (the worker) wrote this, not Prisma itself.
   boundingBox  Json?              @map("bounding_box")
+
+  /// User corrections, additive — valueText/valueDecimal above are the
+  /// model's original output and are NEVER overwritten in place, even when a
+  /// user edits the field. This preserves the "was the model right on this
+  /// field" signal D1/S1a's accuracy measurement depends on. Display/logic
+  /// rule everywhere: override ?? original. correctedAt IS NOT NULL is the
+  /// "has this been corrected" signal (no separate boolean to keep in sync).
+  /// No correctedBy — no real user identity yet (single demo tenant, no
+  /// auth); add at W2 rather than stub it now.
+  overrideValueText    String?   @map("override_value_text")
+  overrideValueDecimal Decimal?  @map("override_value_decimal") @db.Decimal(19, 4)
+  correctedAt          DateTime? @map("corrected_at") @db.Timestamptz(6)
 
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
 

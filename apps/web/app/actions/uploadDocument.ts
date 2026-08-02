@@ -10,14 +10,45 @@ import { prisma } from "@mou7asib/db";
 import { DEMO_TENANT_ID } from "@/lib/tenant";
 import { scanBufferForMalware } from "@/lib/malwareScanner";
 
-// D2 scope is camera capture only (no PDF path in the UI, confirmed scope
-// decision) — the allowlist is narrowed to what a phone camera can actually
-// produce, not CLAUDE.md §8.4's full list. Checked by magic bytes, never by
-// extension or the client-declared Content-Type.
-const ALLOWED_MIME_TYPES = new Set(["image/jpeg", "image/png"]);
+// Photos (camera capture) and PDFs (how Moroccan businesses commonly
+// actually receive invoices — confirmed by a real-document test). Checked
+// by magic bytes, never by extension or the client-declared Content-Type.
+const ALLOWED_MIME_TYPES = new Set(["image/jpeg", "image/png", "application/pdf"]);
 const MAX_UPLOAD_BYTES = 20 * 1024 * 1024;
 
 export type UploadState = { error: string } | null;
+
+interface NormalizedUpload {
+  bytes: Buffer;
+  extension: string;
+  width: number | null;
+  height: number | null;
+}
+
+// Images get the full sharp pipeline (EXIF auto-orient + strip); PDFs have
+// no EXIF concept and no image dimensions to measure at upload time — the
+// worker rasterizes a preview and fills storedImageWidth/Height in once it
+// processes the document (see apps/ai's worker.py / db.py).
+async function normalizeUpload(bytes: Buffer, mime: string): Promise<NormalizedUpload | null> {
+  if (mime === "application/pdf") {
+    return { bytes, extension: "pdf", width: null, height: null };
+  }
+
+  // Auto-orient from EXIF (bakes rotation into pixels, otherwise a portrait
+  // phone photo displays sideways once EXIF is stripped), then re-encode
+  // without .withMetadata() — sharp strips all metadata (incl. GPS) by
+  // default unless explicitly asked to keep it (CLAUDE.md §8.4).
+  const normalized = sharp(bytes, { failOn: "none" }).rotate();
+  const { data, info } =
+    mime === "image/png"
+      ? await normalized.png().toBuffer({ resolveWithObject: true })
+      : await normalized.jpeg({ quality: 90 }).toBuffer({ resolveWithObject: true });
+
+  if (info.width === undefined || info.height === undefined) {
+    return null;
+  }
+  return { bytes: data, extension: mime === "image/png" ? "png" : "jpg", width: info.width, height: info.height };
+}
 
 export async function uploadDocument(
   _prevState: UploadState,
@@ -25,7 +56,7 @@ export async function uploadDocument(
 ): Promise<UploadState> {
   const file = formData.get("photo");
   if (!(file instanceof File) || file.size === 0) {
-    return { error: "Aucune photo reçue." };
+    return { error: "Aucun fichier reçu." };
   }
 
   const originalBytes = Buffer.from(await file.arrayBuffer());
@@ -35,7 +66,7 @@ export async function uploadDocument(
 
   const detected = await fileTypeFromBuffer(originalBytes);
   if (detected === undefined || !ALLOWED_MIME_TYPES.has(detected.mime)) {
-    return { error: "Format non pris en charge. Utilisez une photo JPEG ou PNG." };
+    return { error: "Format non pris en charge. Utilisez une photo JPEG/PNG ou un PDF." };
   }
 
   const scanResult = await scanBufferForMalware(originalBytes);
@@ -43,26 +74,17 @@ export async function uploadDocument(
     return { error: "Le fichier a été rejeté par l'analyse antivirus." };
   }
 
-  // Auto-orient from EXIF (bakes rotation into pixels, otherwise a portrait
-  // phone photo displays sideways once EXIF is stripped), then re-encode
-  // without .withMetadata() — sharp strips all metadata (incl. GPS) by
-  // default unless explicitly asked to keep it (CLAUDE.md §8.4).
-  const normalized = sharp(originalBytes, { failOn: "none" }).rotate();
-  const { data: normalizedBytes, info } =
-    detected.mime === "image/png"
-      ? await normalized.png().toBuffer({ resolveWithObject: true })
-      : await normalized.jpeg({ quality: 90 }).toBuffer({ resolveWithObject: true });
-
-  if (info.width === undefined || info.height === undefined) {
+  const normalized = await normalizeUpload(originalBytes, detected.mime);
+  if (normalized === null) {
     return { error: "Impossible de lire les dimensions de l'image." };
   }
+  const { bytes: normalizedBytes, extension, width, height } = normalized;
 
   const contentHash = crypto
     .createHash("sha256")
     .update(normalizedBytes)
     .digest("hex")
     .slice(0, 16);
-  const extension = detected.mime === "image/png" ? "png" : "jpg";
 
   // Duplicate detection (CLAUDE.md §7.2) — a re-upload of the same content
   // costs nothing and lands on the same document rather than a new row.
@@ -76,11 +98,11 @@ export async function uploadDocument(
     documentId = existing.id;
   } else {
     // Outside apps/web's public/static tree entirely — the only access path
-    // is the authorized Route Handler in app/api/documents/[id]/image, not a
-    // direct static URL. This is the demo-scoped simplification of §8.4's
-    // "object storage with signed URLs" — same security property (no direct/
-    // predictable/unauthorized access), different mechanism, documented here
-    // and in the D2 plan rather than silently narrowed.
+    // is the authorized Route Handlers in app/api/documents/[id]/{image,preview},
+    // not a direct static URL. This is the demo-scoped simplification of
+    // §8.4's "object storage with signed URLs" — same security property (no
+    // direct/predictable/unauthorized access), different mechanism,
+    // documented here and in the D2 plan rather than silently narrowed.
     const repoRoot = path.resolve(/* turbopackIgnore: true */ process.cwd(), "..", "..");
     const relativeStoragePath = path.join(
       "uploads",
@@ -97,12 +119,12 @@ export async function uploadDocument(
         data: {
           tenantId: DEMO_TENANT_ID,
           contentHash,
-          originalFilename: file.name.length > 0 ? file.name : `capture.${extension}`,
+          originalFilename: file.name.length > 0 ? file.name : `document.${extension}`,
           mimeType: detected.mime,
           byteSize: normalizedBytes.byteLength,
           storagePath: relativeStoragePath,
-          storedImageWidth: info.width,
-          storedImageHeight: info.height,
+          storedImageWidth: width,
+          storedImageHeight: height,
           status: "queued",
         },
       });

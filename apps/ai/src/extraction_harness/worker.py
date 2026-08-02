@@ -18,6 +18,7 @@ from pathlib import Path
 from extraction_harness import db
 from extraction_harness.extract import extract_document
 from extraction_harness.grounding import ground_extraction
+from extraction_harness.routing import rasterize_first_page
 from extraction_harness.scoring import check_arithmetic
 
 logger = logging.getLogger("extraction_harness.worker")
@@ -41,6 +42,39 @@ def _repo_root() -> Path:
     return Path(__file__).resolve().parents[4]
 
 
+def _rasterize_preview_for_pdf(conn: db.DictConnection, job: db.ClaimedJob, document_path: Path) -> Path | None:
+    """PDFs can't render in an <img> tag, so the worker rasterizes a first-page
+    preview PNG (routing.rasterize_first_page, proven — sharp's PDF support is
+    an unverified capability on this machine, the same trap as the HEIC
+    gotcha). Non-fatal: a corrupt/encrypted PDF must not abort extraction.
+    Returns the absolute preview path on success, so it can also be reused as
+    the OCR-grounding image (see the call site below) — same artifact, no
+    second rasterization.
+    """
+    storage_path_obj = Path(job.storage_path)
+    preview_relative_path = storage_path_obj.with_name(f"{storage_path_obj.stem}-preview.png")
+    preview_absolute_path = _repo_root() / preview_relative_path
+
+    try:
+        from PIL import Image
+
+        rasterize_first_page(document_path, preview_absolute_path)
+        with Image.open(preview_absolute_path) as image:
+            width, height = image.size
+    except Exception:
+        logger.exception("PDF preview rasterization failed for document %s", job.document_id)
+        return None
+
+    db.record_document_preview(
+        conn,
+        document_id=job.document_id,
+        preview_path=str(preview_relative_path),
+        width=width,
+        height=height,
+    )
+    return preview_absolute_path
+
+
 def process_job(conn: db.DictConnection, job: db.ClaimedJob) -> None:
     document_path = _repo_root() / job.storage_path
     if not document_path.exists():
@@ -51,6 +85,10 @@ def process_job(conn: db.DictConnection, job: db.ClaimedJob) -> None:
             error_message=f"Stored file missing: {document_path}",
         )
         return
+
+    ocr_image_path: Path | None = None
+    if document_path.suffix.lower() == ".pdf":
+        ocr_image_path = _rasterize_preview_for_pdf(conn, job, document_path)
 
     with tempfile.TemporaryDirectory() as tmp_dir_str:
         attempts = extract_document(
@@ -87,7 +125,9 @@ def process_job(conn: db.DictConnection, job: db.ClaimedJob) -> None:
     final_path = attempts[-1].cost.path
     final_arithmetic_ok = check_arithmetic(final_extraction)
 
-    grounded_fields = ground_extraction(final_extraction, final_path, document_path, final_arithmetic_ok)
+    grounded_fields = ground_extraction(
+        final_extraction, final_path, document_path, final_arithmetic_ok, ocr_image_path=ocr_image_path
+    )
     db.record_extracted_fields(
         conn,
         document_id=job.document_id,

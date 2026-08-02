@@ -176,3 +176,44 @@ def test_mark_document_failed(conn: db.DictConnection, document_and_job: tuple[s
         assert job_row is not None
         assert job_row["status"] == "failed"
         assert job_row["last_error"] == "test failure"
+
+
+def test_record_document_preview(conn: db.DictConnection, document_and_job: tuple[str, str]) -> None:
+    document_id, _job_id = document_and_job
+
+    db.record_document_preview(
+        conn,
+        document_id=document_id,
+        preview_path="uploads/documents/test/test-preview.png",
+        width=1200,
+        height=1600,
+    )
+
+    with psycopg.connect(db._database_url(), row_factory=dict_row) as verify_conn, verify_conn.cursor() as cur:
+        cur.execute(
+            "SELECT preview_image_path, stored_image_width, stored_image_height "
+            "FROM documents WHERE id = %(id)s",
+            {"id": document_id},
+        )
+        row = cur.fetchone()
+        assert row is not None
+        assert row["preview_image_path"] == "uploads/documents/test/test-preview.png"
+        assert row["stored_image_width"] == 1200
+        assert row["stored_image_height"] == 1600
+
+
+def test_claim_next_job_excludes_soft_deleted_document(
+    conn: db.DictConnection, document_and_job: tuple[str, str]
+) -> None:
+    document_id, _job_id = document_and_job
+
+    with conn.cursor() as cur:
+        cur.execute("UPDATE documents SET deleted_at = now() WHERE id = %(id)s", {"id": document_id})
+    conn.commit()
+
+    claimed = db.claim_next_job(conn, "pytest-worker")
+
+    # Real correctness issue this guards: without the deleted_at filter, a
+    # worker could resurrect a deleted document's status after the user
+    # believed it gone.
+    assert claimed is None

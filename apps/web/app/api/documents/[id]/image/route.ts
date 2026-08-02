@@ -1,13 +1,15 @@
 import { readFile } from "node:fs/promises";
-import path from "node:path";
 import { NextResponse } from "next/server";
 import { prisma } from "@mou7asib/db";
-import { DEMO_TENANT_ID } from "@/lib/tenant";
+import { resolveUploadPath, visibleDocumentWhere } from "@/lib/documents";
 
 // CLAUDE.md §8.4 — the demo-scoped substitute for a pre-signed URL: a
-// per-request authorization check (tenantId match) instead of a time-limited
-// signature. Files live outside apps/web's public/static tree entirely, so
-// this route is the only path that can ever reach them.
+// per-request authorization check (tenantId + not-deleted) instead of a
+// time-limited signature. Files live outside apps/web's public/static tree
+// entirely, so this route is the only path that can ever reach them. This
+// always serves the raw source file (download/original), whatever its mime
+// type — for a browser-displayable preview (PDFs can't render in <img>),
+// see the sibling /preview route.
 export async function GET(
   _request: Request,
   { params }: { params: Promise<{ id: string }> },
@@ -15,7 +17,7 @@ export async function GET(
   const { id } = await params;
 
   const document = await prisma.document.findFirst({
-    where: { id, tenantId: DEMO_TENANT_ID },
+    where: { id, ...visibleDocumentWhere() },
     select: { storagePath: true, mimeType: true },
   });
 
@@ -23,13 +25,8 @@ export async function GET(
     return NextResponse.json({ error: "Document introuvable." }, { status: 404 });
   }
 
-  const repoRoot = path.resolve(/* turbopackIgnore: true */ process.cwd(), "..", "..");
-  const uploadsRoot = path.join(repoRoot, "uploads");
-  const absolutePath = path.resolve(repoRoot, document.storagePath);
-
-  // Defense in depth: storagePath is always server-generated, never client
-  // input, but refuse to serve anything outside the uploads root regardless.
-  if (!absolutePath.startsWith(`${uploadsRoot}${path.sep}`)) {
+  const absolutePath = resolveUploadPath(document.storagePath);
+  if (absolutePath === null) {
     return NextResponse.json({ error: "Chemin invalide." }, { status: 400 });
   }
 

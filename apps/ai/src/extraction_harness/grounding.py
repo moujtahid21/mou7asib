@@ -6,14 +6,17 @@ reported bounding boxes back to the original image — see the D2 plan).
 
 Two paths, mirroring routing.py's cheap/OCR split:
 - text_layer: PyMuPDF's page.search_for() — exact rects in PDF point-space,
-  essentially free. Dormant in D2's actual product flow (the capture UI is
-  image-only, so decide_path() always returns "ocr" for real D2 documents)
-  but exercised by D1's CLI harness and kept general for S5, which reintroduces
-  PDF upload.
-- ocr: word-level Tesseract OCR + rapidfuzz matching against the same stored
-  image the worker already has. Confidence is a computed blend of fuzzy-match
-  score, Tesseract's own word confidence, and (for amount fields) whether the
-  document's arithmetic cross-check passed.
+  essentially free.
+- ocr: word-level Tesseract OCR + rapidfuzz matching. Confidence is a
+  computed blend of fuzzy-match score, Tesseract's own word confidence, and
+  (for amount fields) whether the document's arithmetic cross-check passed.
+
+The OCR path needs an actual raster image to hand to Tesseract — for a real
+photo/scan, document_path already is one. For a scanned/no-text-layer PDF
+(reachable once PDF upload exists), document_path is a PDF and PIL cannot
+open it directly; ground_extraction's ocr_image_path parameter lets the
+caller supply a pre-rasterized image instead (the worker already produces
+one for display purposes when the source is a PDF — see worker.py).
 """
 
 from __future__ import annotations
@@ -267,8 +270,15 @@ def ground_extraction(
     path: Literal["text_layer", "ocr"],
     document_path: Path,
     arithmetic_ok: bool | None,
+    ocr_image_path: Path | None = None,
 ) -> list[GroundedField]:
-    """Ground every non-null field in an extraction against its source document."""
+    """Ground every non-null field in an extraction against its source document.
+
+    ocr_image_path: the actual raster image to OCR, if different from
+    document_path (e.g. document_path is a PDF — PIL can't open that
+    directly). Defaults to document_path, the correct behaviour for a real
+    image file.
+    """
     page: fitz.Page | None = None
     doc: fitz.Document | None = None
     ocr: OcrDocument | None = None
@@ -277,7 +287,7 @@ def ground_extraction(
         doc = fitz.open(document_path)
         page = doc[0]
     else:
-        ocr = run_ocr(document_path)
+        ocr = run_ocr(ocr_image_path if ocr_image_path is not None else document_path)
 
     try:
         fields: list[GroundedField] = []

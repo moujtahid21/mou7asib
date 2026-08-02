@@ -72,14 +72,22 @@ class ClaimedJob:
 
 
 def requeue_stuck_jobs(conn: DictConnection) -> int:
-    """Startup crash recovery: simple, appropriate for a single worker process."""
+    """Startup crash recovery: simple, appropriate for a single worker process.
+
+    Joins documents and excludes soft-deleted ones — no point requeuing a job
+    for a document the user has since deleted (deleted_at filter, matching
+    claim_next_job below).
+    """
     with conn.cursor() as cur:
         cur.execute(
             """
-            UPDATE extraction_jobs
+            UPDATE extraction_jobs j
             SET status = 'queued', locked_at = NULL, locked_by = NULL
-            WHERE status = 'processing'
-              AND locked_at < now() - make_interval(mins => %(ceiling)s)
+            FROM documents d
+            WHERE j.document_id = d.id
+              AND j.status = 'processing'
+              AND j.locked_at < now() - make_interval(mins => %(ceiling)s)
+              AND d.deleted_at IS NULL
             """,
             {"ceiling": STUCK_JOB_CEILING_MINUTES},
         )
@@ -89,7 +97,12 @@ def requeue_stuck_jobs(conn: DictConnection) -> int:
 
 
 def claim_next_job(conn: DictConnection, worker_id: str) -> ClaimedJob | None:
-    """SELECT ... FOR UPDATE SKIP LOCKED — ADR 0002's own recommended queue mechanism."""
+    """SELECT ... FOR UPDATE SKIP LOCKED — ADR 0002's own recommended queue mechanism.
+
+    Excludes a soft-deleted document's job (deleted_at IS NOT NULL) — without
+    this, a worker could resurrect a deleted document's status after the user
+    believed it gone.
+    """
     with conn.cursor() as cur:
         cur.execute(
             """
@@ -98,6 +111,7 @@ def claim_next_job(conn: DictConnection, worker_id: str) -> ClaimedJob | None:
             FROM extraction_jobs j
             JOIN documents d ON d.id = j.document_id
             WHERE j.status = 'queued'
+              AND d.deleted_at IS NULL
             ORDER BY j.created_at
             FOR UPDATE OF j SKIP LOCKED
             LIMIT 1
@@ -227,6 +241,27 @@ def record_extracted_fields(
                     else None,
                 },
             )
+    conn.commit()
+
+
+def record_document_preview(
+    conn: DictConnection, *, document_id: str, preview_path: str, width: int, height: int
+) -> None:
+    """PDF only — the worker rasterizes a first-page preview (routing.rasterize_first_page)
+    since a raw PDF can't render in an <img> tag. Images never call this; storagePath
+    already IS their preview."""
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            UPDATE documents
+            SET preview_image_path = %(preview_path)s,
+                stored_image_width = %(width)s,
+                stored_image_height = %(height)s,
+                updated_at = now()
+            WHERE id = %(document_id)s
+            """,
+            {"preview_path": preview_path, "width": width, "height": height, "document_id": document_id},
+        )
     conn.commit()
 
 

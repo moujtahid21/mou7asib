@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@mou7asib/db";
-import { DEMO_TENANT_ID } from "@/lib/tenant";
+import { visibleDocumentWhere } from "@/lib/documents";
 
 export async function GET(
   _request: Request,
@@ -9,7 +9,7 @@ export async function GET(
   const { id } = await params;
 
   const document = await prisma.document.findFirst({
-    where: { id, tenantId: DEMO_TENANT_ID },
+    where: { id, ...visibleDocumentWhere() },
     select: { status: true },
   });
 

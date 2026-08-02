@@ -270,3 +270,46 @@ its extracted values, to honour the "local only" condition of that consent.
   work out of the actual content, reporting only in general/qualitative terms → delete or
   gitignore afterward. Slower than just using a document, but it is what let this test
   happen at all instead of being blocked entirely.
+
+---
+
+## 2026-08-02 — D2 dashboard extension
+
+### D-13 · PDF upload + document management: retry/soft-delete/correction semantics
+
+Extended D2 with PDF upload (Moroccan businesses commonly receive invoices as PDF, not just
+photos — confirmed by D-12's real-document test) and document management: richer list/filter,
+delete, retry, and editable extracted fields. Verified end to end against the real local
+worker: a synthetic PDF (not personal data) uploaded, routed correctly to the cheap
+text-layer path, extracted, grounded (21/23 fields with real bounding boxes), reviewed,
+edited, reverted, deleted, and retried — all confirmed working via direct testing.
+
+**Changes:**
+
+- **Retry creates a new `ExtractionJob` row, never reuses/resets the failed one.** Preserves
+  the failed job's audit history (CLAUDE.md §7.1) rather than overwriting it — mirrors
+  `Document.currentAttemptId`'s existing "reprocess creates a new attempt, repoints, doesn't
+  delete" pattern one level up. Idempotency-guarded: a document already `queued`/`processing`
+  can't get a second competing job.
+- **Delete is soft on the `Document` row (`deletedAt`), hard on the file bytes.** CLAUDE.md
+  §9 wants soft-delete for non-ledger user-facing records — nothing here is a ledger record
+  yet. But the raw image/PDF is the most sensitive artifact (can show more than the extracted
+  fields), and there's no legal retention obligation yet blocking its immediate physical
+  removal (CLAUDE.md §8.6), so it's actually deleted while metadata + an audit trail survive.
+  **No purge job for soft-deleted rows** — kept indefinitely; revisit only once a real legal
+  retention obligation exists to purge against.
+- **Editing a field adds override columns (`overrideValueText`/`overrideValueDecimal`/
+  `correctedAt`), never overwrites the model's original output.** Display rule everywhere:
+  `override ?? original`. This is voluntary, not a CLAUDE.md compliance requirement (the
+  append-only rule is about posted ledger entries, which don't exist yet) — done because
+  overwriting in place would permanently destroy the "was the model right on this field"
+  signal D1/S1a's whole accuracy-measurement mission depends on.
+- **Two residual gaps flagged, not solved, consistent with this project's practice of naming
+  a gap rather than silently narrowing scope:**
+  - PDF parsing (PyMuPDF, in the worker) has no process/container sandboxing yet (CLAUDE.md
+    §8.4) — a wall-clock timeout stopgap only, same reasoning already accepted for D2's
+    malware-scan deferral (single demo tenant, founders' own documents only). A prerequisite
+    before this ever accepts a document from anyone else.
+  - PDF metadata (author, embedded XMP GPS some scanners write) has no stripping step —
+    no vetted Node PDF-metadata tool exists in this stack yet, matching the same
+    "don't reach for an unverified capability" discipline already applied to `sharp`/HEIC.

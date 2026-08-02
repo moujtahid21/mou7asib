@@ -11,14 +11,16 @@ export default function CaptureForm() {
   return (
     <form action={formAction} className="mt-6">
       <label htmlFor="photo" className="block text-sm font-medium text-slate-900">
-        Photo de la facture
+        Photo ou PDF de la facture
       </label>
+      {/* No `capture` attribute: mobile browsers still offer "take photo" as
+          one file-picker option, but this also allows choosing an existing
+          file — needed for PDFs, which nobody photographs. */}
       <input
         id="photo"
         name="photo"
         type="file"
-        accept="image/*"
-        capture="environment"
+        accept="image/*,application/pdf"
         required
         className="mt-2 block w-full rounded border border-slate-300 p-2 text-sm"
       />

@@ -12,6 +12,7 @@ from extraction_harness.grounding import (
     _search_candidates,
     ground_extraction,
 )
+from extraction_harness.routing import rasterize_first_page
 from extraction_harness.schemas import InvoiceExtraction, TvaLine
 
 
@@ -140,3 +141,25 @@ def test_ground_extraction_finds_rate_printed_as_percentage(tmp_path: Path) -> N
     rate_field = by_name[("rate", "tva_lines", 0)]
     assert rate_field.bounding_box is not None
     assert rate_field.confidence == TEXT_LAYER_MATCH_CONFIDENCE
+
+
+def test_ground_extraction_ocr_path_on_pdf_uses_ocr_image_path_not_the_pdf_itself(tmp_path: Path) -> None:
+    # PIL cannot open a PDF directly (Image.open on a .pdf raises) — this is
+    # the exact latent bug the dashboard extension's PDF-upload support makes
+    # reachable. Simulates what worker.py does: rasterize a preview first,
+    # then pass that image, not the source PDF, as ocr_image_path.
+    pdf_path = tmp_path / "scanned.pdf"
+    _write_pdf(pdf_path, ["FA-2026-0099", "Total TTC 999.00 MAD"])
+    preview_path = tmp_path / "scanned-preview.png"
+    rasterize_first_page(pdf_path, preview_path)
+
+    extraction = InvoiceExtraction(invoice_number="FA-2026-0099", total_ttc=Decimal("999.00"))
+
+    # Would raise (PIL can't open a PDF) without ocr_image_path routing OCR to
+    # the rasterized preview instead of document_path.
+    fields = ground_extraction(
+        extraction, "ocr", pdf_path, arithmetic_ok=None, ocr_image_path=preview_path
+    )
+
+    by_name = {f.field_name: f for f in fields if f.group_name is None}
+    assert by_name["invoice_number"].value_text == "FA-2026-0099"
