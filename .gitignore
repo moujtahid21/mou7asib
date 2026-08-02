@@ -22,6 +22,10 @@ packages/db/generated/
 # uploads — CLAUDE.md §14
 uploads/
 
+# local test outputs that may carry real (consented, locally-processed)
+# third-party document content — never committed, see docs/decision-log.md
+results/
+
 # vercel
 .vercel
 

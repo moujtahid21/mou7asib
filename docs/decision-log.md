@@ -229,3 +229,44 @@ Practical consequences:
 | Q-5 | Will a TPE pay for extraction without bookkeeping? | ADR 0006 flip condition 1 — now answered by the demo → accountant conversation (D-09/D-10) rather than separately |
 | Q-6 | Will an expert-comptable accept a structured export, and in what format? | ADR 0006 flip condition 5 — same conversation |
 | Q-8 | What, concretely, would make this contact say "yes, I'd use this"? | Defines the demo's acceptance criterion. Worth asking them *before* building, even without a demo — it is a five-minute question and it aims the whole milestone |
+
+---
+
+## 2026-08-02 — D2's first real-document test
+
+### D-12 · Schema targets commercial invoices, not household bills — confirmed on a real document
+
+Ran D2's pipeline end to end against a real Moroccan document for the first time — an
+anonymised household electricity bill, used with the data subject's explicit, scoped
+consent (local processing only, no cloud AI provider, deletable afterward). No document
+content is recorded here, only what the test revealed about the product. Processing stayed
+on local Ollama throughout; the agent assisting with this work did not read the document or
+its extracted values, to honour the "local only" condition of that consent.
+
+**Changes:**
+
+- **The safety design holds on a real document, not just synthetic ones.** Fields redacted
+  in the source image (customer name, ICE, IF) came back empty rather than hallucinated —
+  CLAUDE.md §7.2's "flag rather than guess" worked under real conditions, including a
+  document type never specifically prompted for.
+- **Surfaces a genuine document-type mismatch, not a bug.** `InvoiceExtraction` implicitly
+  assumes `total_ttc` *is* the amount owed — true for a commercial *facture*, not
+  necessarily for a utility bill, which can carry a "Net à payer" distinct from the period's
+  TTC (carried-over balance, adjustments — concepts the schema has no field for). The model
+  extracted a plausible "amount to pay" rather than the literal TTC line, reasonable given
+  the prompt but not what the schema means by `total_ttc`.
+- **Household bills are out of scope, and that's why this is a fine result, not a bad one.**
+  CLAUDE.md's domain is a TPE's own business invoicing (supplier *factures* for
+  bookkeeping/TVA), not household bills. This doesn't lower confidence in D1/D2's numbers —
+  it confirms the schema targets the right document class and hasn't yet been tested against
+  it specifically.
+- **The representative S1b test is still open**: a real commercial invoice (a supplier bill
+  to the founders' own business), not a utility bill. Corpus acquisition (D-05/D-08) remains
+  the real dependency.
+- **Process worth repeating for future real-document sourcing**: third-party document →
+  explicit scoped consent from the data subject → visual redaction of identifying fields →
+  flatten to a rasterized image (removes any residual PDF text layer under the redaction,
+  which a black box alone does not) → process locally → keep the agent assisting with the
+  work out of the actual content, reporting only in general/qualitative terms → delete or
+  gitignore afterward. Slower than just using a document, but it is what let this test
+  happen at all instead of being blocked entirely.
