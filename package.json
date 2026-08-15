@@ -14,6 +14,7 @@
     "build": "npm run build --workspace @mou7asib/web",
     "dev": "npm run dev --workspace @mou7asib/web",
     "typecheck": "npm run typecheck --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present",
     "postinstall": "npm run db:generate",
     "db:generate": "npm run generate --workspace @mou7asib/db",
     "db:migrate": "npm run migrate --workspace @mou7asib/db",
@@ -28,6 +29,7 @@
     "@prisma/engines@7.9.1": true,
     "prisma@7.9.1": true,
     "sharp@0.34.5": true,
-    "sharp@0.35.3": true
+    "sharp@0.35.3": true,
+    "argon2@0.45.1": true
   }
 }

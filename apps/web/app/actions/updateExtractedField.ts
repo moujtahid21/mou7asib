@@ -1,8 +1,10 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { Prisma, prisma } from "@mou7asib/db";
+import { Prisma, withTenant } from "@mou7asib/db";
 import { visibleDocumentWhere } from "@/lib/documents";
+import { requireSession } from "@/lib/auth";
+import { can } from "@/lib/policy";
 
 export type UpdateFieldState = { error: string } | null;
 
@@ -23,74 +25,84 @@ export async function updateExtractedField(
   _prevState: UpdateFieldState,
   formData: FormData,
 ): Promise<UpdateFieldState> {
-  const document = await prisma.document.findFirst({
-    where: { id: identity.documentId, ...visibleDocumentWhere() },
-    select: { currentAttemptId: true },
-  });
-  if (!document || document.currentAttemptId === null) {
-    return { error: "Document introuvable ou non extrait." };
-  }
-
-  const field = await prisma.extractedField.findFirst({
-    where: {
-      documentId: identity.documentId,
-      attemptId: document.currentAttemptId,
-      fieldName: identity.fieldName,
-      groupName: identity.groupName,
-      groupIndex: identity.groupIndex,
-    },
-    select: { id: true, fieldType: true },
-  });
-  if (!field) {
-    return { error: "Champ introuvable." };
+  const session = await requireSession();
+  if (!can(session.role, "document:write")) {
+    return { error: "Action non autorisée pour ce rôle." };
   }
 
   const action = formData.get("action");
-
-  if (action === "revert") {
-    await prisma.extractedField.update({
-      where: { id: field.id },
-      data: { overrideValueText: null, overrideValueDecimal: null, correctedAt: null },
-    });
-    revalidatePath(`/documents/${identity.documentId}`);
-    return null;
-  }
-
   const rawValue = formData.get("value");
-  if (typeof rawValue !== "string" || rawValue.trim().length === 0) {
-    return { error: "Valeur vide." };
-  }
-  const trimmedValue = rawValue.trim();
 
-  if (field.fieldType === "decimal") {
-    // Never coerce through a JS number first (CLAUDE.md §6) — Prisma.Decimal
-    // parses the string directly. Reject rather than silently guess on a
-    // malformed amount.
-    let parsed: Prisma.Decimal;
-    try {
-      parsed = new Prisma.Decimal(trimmedValue);
-    } catch {
-      return { error: "Montant invalide." };
+  const result = await withTenant(session.tenantId, async (tx): Promise<UpdateFieldState> => {
+    const document = await tx.document.findFirst({
+      where: { id: identity.documentId, ...visibleDocumentWhere(session.tenantId) },
+      select: { currentAttemptId: true },
+    });
+    if (!document || document.currentAttemptId === null) {
+      return { error: "Document introuvable ou non extrait." };
     }
-    await prisma.extractedField.update({
-      where: { id: field.id },
-      data: { overrideValueDecimal: parsed, overrideValueText: null, correctedAt: new Date() },
-    });
-  } else if (field.fieldType === "date") {
-    if (Number.isNaN(Date.parse(trimmedValue))) {
-      return { error: "Date invalide (AAAA-MM-JJ)." };
-    }
-    await prisma.extractedField.update({
-      where: { id: field.id },
-      data: { overrideValueText: trimmedValue, overrideValueDecimal: null, correctedAt: new Date() },
-    });
-  } else {
-    await prisma.extractedField.update({
-      where: { id: field.id },
-      data: { overrideValueText: trimmedValue, overrideValueDecimal: null, correctedAt: new Date() },
-    });
-  }
 
-  revalidatePath(`/documents/${identity.documentId}`);
-  return null;
+    const field = await tx.extractedField.findFirst({
+      where: {
+        documentId: identity.documentId,
+        attemptId: document.currentAttemptId,
+        fieldName: identity.fieldName,
+        groupName: identity.groupName,
+        groupIndex: identity.groupIndex,
+      },
+      select: { id: true, fieldType: true },
+    });
+    if (!field) {
+      return { error: "Champ introuvable." };
+    }
+
+    if (action === "revert") {
+      await tx.extractedField.update({
+        where: { id: field.id },
+        data: { overrideValueText: null, overrideValueDecimal: null, correctedAt: null },
+      });
+      return null;
+    }
+
+    if (typeof rawValue !== "string" || rawValue.trim().length === 0) {
+      return { error: "Valeur vide." };
+    }
+    const trimmedValue = rawValue.trim();
+
+    if (field.fieldType === "decimal") {
+      // Never coerce through a JS number first (CLAUDE.md §6) — Prisma.Decimal
+      // parses the string directly. Reject rather than silently guess on a
+      // malformed amount.
+      let parsed: Prisma.Decimal;
+      try {
+        parsed = new Prisma.Decimal(trimmedValue);
+      } catch {
+        return { error: "Montant invalide." };
+      }
+      await tx.extractedField.update({
+        where: { id: field.id },
+        data: { overrideValueDecimal: parsed, overrideValueText: null, correctedAt: new Date() },
+      });
+    } else if (field.fieldType === "date") {
+      if (Number.isNaN(Date.parse(trimmedValue))) {
+        return { error: "Date invalide (AAAA-MM-JJ)." };
+      }
+      await tx.extractedField.update({
+        where: { id: field.id },
+        data: { overrideValueText: trimmedValue, overrideValueDecimal: null, correctedAt: new Date() },
+      });
+    } else {
+      await tx.extractedField.update({
+        where: { id: field.id },
+        data: { overrideValueText: trimmedValue, overrideValueDecimal: null, correctedAt: new Date() },
+      });
+    }
+
+    return null;
+  });
+
+  if (result === null) {
+    revalidatePath(`/documents/${identity.documentId}`);
+  }
+  return result;
 }

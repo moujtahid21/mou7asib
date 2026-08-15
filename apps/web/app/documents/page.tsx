@@ -1,6 +1,8 @@
 import Link from "next/link";
-import { prisma, type DocumentStatus } from "@mou7asib/db";
+import { withTenant, type DocumentStatus } from "@mou7asib/db";
+import { Badge, type BadgeTone } from "@mou7asib/ui";
 import { visibleDocumentWhere } from "@/lib/documents";
+import { requireSession } from "@/lib/auth";
 import { deleteDocument } from "@/app/actions/deleteDocument";
 import { retryDocument } from "@/app/actions/retryDocument";
 
@@ -15,6 +17,14 @@ const STATUS_LABELS_FR: Record<string, string> = {
   processing: "En cours",
   extracted: "Extrait",
   failed: "Échec",
+};
+
+const STATUS_TONES: Record<string, BadgeTone> = {
+  uploaded: "neutral",
+  queued: "neutral",
+  processing: "ai",
+  extracted: "pos",
+  failed: "neg",
 };
 
 const STATUS_VALUES: readonly DocumentStatus[] = [
@@ -40,41 +50,81 @@ interface DocumentsPageProps {
 }
 
 export default async function DocumentsPage({ searchParams }: DocumentsPageProps) {
+  const session = await requireSession();
   const params = await searchParams;
   const statusFilter = params.status !== undefined && isDocumentStatus(params.status) ? params.status : undefined;
   const search = params.q?.trim();
   const sortByStatus = params.sort === "status";
 
-  const documents = await prisma.document.findMany({
-    where: {
-      ...visibleDocumentWhere(),
-      ...(statusFilter !== undefined ? { status: statusFilter } : {}),
-      ...(search !== undefined && search.length > 0
-        ? { originalFilename: { contains: search, mode: "insensitive" } }
-        : {}),
-    },
-    select: { id: true, originalFilename: true, status: true, uploadedAt: true },
-    orderBy: sortByStatus ? { status: "asc" } : { uploadedAt: "desc" },
-    take: 50,
+  const { documents, suggestionAcceptance } = await withTenant(session.tenantId, async (tx) => {
+    const docs = await tx.document.findMany({
+      where: {
+        ...visibleDocumentWhere(session.tenantId),
+        ...(statusFilter !== undefined ? { status: statusFilter } : {}),
+        ...(search !== undefined && search.length > 0
+          ? { originalFilename: { contains: search, mode: "insensitive" } }
+          : {}),
+      },
+      select: { id: true, originalFilename: true, status: true, uploadedAt: true },
+      orderBy: sortByStatus ? { status: "asc" } : { uploadedAt: "desc" },
+      take: 50,
+    });
+
+    // S6's required acceptance-rate metric (lib/postingSuggestion.ts's precedent panel) —
+    // read from AuditLog, which postDocumentEntry.ts writes to every time a suggestion was
+    // offered. Small volume per tenant, so counting in JS rather than a JSON-path query.
+    const outcomes = await tx.auditLog.findMany({
+      where: { tenantId: session.tenantId, action: "posting_suggestion_outcome" },
+      select: { after: true },
+    });
+    const total = outcomes.length;
+    const accepted = outcomes.filter(
+      (row) => row.after !== null && typeof row.after === "object" && (row.after as { outcome?: string }).outcome === "accepted",
+    ).length;
+
+    return { documents: docs, suggestionAcceptance: total === 0 ? null : { accepted, total } };
   });
 
   return (
-    <main className="mx-auto max-w-md p-6">
-      <h1 className="text-xl font-semibold">Documents précédents</h1>
+    <div className="mx-auto flex max-w-3xl flex-col gap-4">
+      <div className="flex items-center justify-between gap-3">
+        <div
+          role="alert"
+          className="flex-1 rounded-xl border border-dashed border-border-2 bg-surface-3 p-3.5 text-[12.5px] text-fg-2"
+        >
+          Réception — factures et pièces à vérifier avant comptabilisation. Une fois
+          qu&apos;un fournisseur a été comptabilisé une première fois, sa fiche propose les
+          comptes habituellement utilisés, appris sur l&apos;historique de ce tenant
+          uniquement — jamais posté sans confirmation.
+          {suggestionAcceptance !== null && (
+            <span className="mt-1.5 block font-mono text-[11px] text-fg-3">
+              Propositions acceptées telles quelles : {suggestionAcceptance.accepted}/
+              {suggestionAcceptance.total} (
+              {Math.round((suggestionAcceptance.accepted / suggestionAcceptance.total) * 100)}%)
+            </span>
+          )}
+        </div>
+        <Link
+          href="/capture"
+          className="shrink-0 rounded-lg bg-fg px-4 py-2.5 text-sm font-medium text-bg"
+        >
+          + Nouvelle facture
+        </Link>
+      </div>
 
       {/* Plain GET form — navigates via the URL, no client-side JS needed. */}
-      <form method="get" className="mt-4 flex gap-2">
+      <form method="get" className="flex flex-wrap gap-2">
         <input
           type="search"
           name="q"
           defaultValue={params.q ?? ""}
           placeholder="Rechercher un fichier…"
-          className="flex-1 rounded border border-slate-300 px-2 py-1.5 text-sm"
+          className="min-w-[200px] flex-1 rounded-lg border border-border-2 px-2.5 py-1.5 text-sm"
         />
         <select
           name="status"
           defaultValue={params.status ?? "all"}
-          className="rounded border border-slate-300 px-2 py-1.5 text-sm"
+          className="rounded-lg border border-border-2 px-2.5 py-1.5 text-sm"
         >
           <option value="all">Tous les statuts</option>
           {STATUS_VALUES.map((status) => (
@@ -86,44 +136,44 @@ export default async function DocumentsPage({ searchParams }: DocumentsPageProps
         <select
           name="sort"
           defaultValue={params.sort ?? "date"}
-          className="rounded border border-slate-300 px-2 py-1.5 text-sm"
+          className="rounded-lg border border-border-2 px-2.5 py-1.5 text-sm"
         >
           <option value="date">Plus récent</option>
           <option value="status">Statut</option>
         </select>
-        <button type="submit" className="rounded border border-slate-300 px-3 py-1.5 text-sm">
+        <button type="submit" className="rounded-lg border border-border-2 px-3 py-1.5 text-sm font-medium text-fg">
           Filtrer
         </button>
       </form>
 
       {documents.length === 0 ? (
-        <p className="mt-6 rounded border border-slate-300 p-4 text-sm text-slate-600">
+        <p className="rounded-xl border border-border-2 bg-surface p-4 text-sm text-fg-2">
           Aucun document ne correspond.
         </p>
       ) : (
-        <ul className="mt-6 space-y-2">
+        <ul className="flex flex-col gap-2">
           {documents.map((doc) => {
             const boundDelete = deleteDocument.bind(null, doc.id);
             const boundRetry = retryDocument.bind(null, doc.id);
             return (
-              <li key={doc.id} className="rounded border border-slate-300 p-3">
-                <Link href={`/documents/${doc.id}`} className="flex items-center justify-between text-sm">
-                  <span className="truncate">{doc.originalFilename}</span>
-                  <span className="ms-3 shrink-0 text-slate-500">
+              <li key={doc.id} className="rounded-xl border border-border bg-surface p-3 shadow-card">
+                <Link href={`/documents/${doc.id}`} className="flex items-center justify-between gap-3 text-sm">
+                  <span className="truncate font-medium text-fg">{doc.originalFilename}</span>
+                  <Badge tone={STATUS_TONES[doc.status] ?? "neutral"}>
                     {STATUS_LABELS_FR[doc.status] ?? doc.status}
-                  </span>
+                  </Badge>
                 </Link>
-                <p className="mt-1 text-xs text-slate-400">{dateTimeFormatter.format(doc.uploadedAt)}</p>
-                <div className="mt-2 flex gap-2">
+                <p className="mt-1 font-mono text-[11px] text-fg-3">{dateTimeFormatter.format(doc.uploadedAt)}</p>
+                <div className="mt-2 flex gap-3">
                   {doc.status === "failed" && (
                     <form action={boundRetry}>
-                      <button type="submit" className="text-xs font-medium text-slate-700 underline">
+                      <button type="submit" className="text-xs font-medium text-fg-2 underline">
                         Réessayer
                       </button>
                     </form>
                   )}
                   <form action={boundDelete}>
-                    <button type="submit" className="text-xs font-medium text-red-700 underline">
+                    <button type="submit" className="text-xs font-medium text-neg underline">
                       Supprimer
                     </button>
                   </form>
@@ -133,10 +183,6 @@ export default async function DocumentsPage({ searchParams }: DocumentsPageProps
           })}
         </ul>
       )}
-
-      <Link href="/capture" className="mt-6 block text-sm font-medium text-slate-900">
-        + Nouvelle facture
-      </Link>
-    </main>
+    </div>
   );
 }

@@ -130,10 +130,17 @@ uv run ruff check .
 - **No FastAPI service.** D2's worker talks to Postgres, not HTTP — see the D2 plan for why
   a synchronous request/response layer isn't needed yet. FastAPI arrives when apps/ai needs
   to expose something over a network boundary (ADR 0002 Option B, post-demo).
-- **D2's tenancy is a single hardcoded demo tenant**, not real multi-tenancy or auth —
-  explicit ADR 0006 scope decision, not an oversight. Every table still has a real,
-  indexed `tenantId` column and every query still filters on it; only the *enforcement*
-  (RLS policies, real auth) is deferred to W2.
+- **This worker connects as the RLS-bypassing role.** Real multi-tenancy, RLS, and auth
+  landed on the `apps/web` side in ADR 0007's phase 1 (see `packages/db/README.md`) — but
+  `db.py` (`_database_url()`) reads plain `DATABASE_URL`, the schema-owning `mou7asib`
+  role, which is a Postgres superuser and therefore bypasses Row Level Security
+  unconditionally, same root cause `packages/db/README.md` documents for why `apps/web`
+  had to be split onto `APP_DATABASE_URL`/`mou7asib_app` instead. In practice this worker
+  still only ever touches the job it claimed (`ExtractionJob.tenantId`, set correctly by
+  `apps/web`'s upload action), so it isn't a live cross-tenant leak today — but RLS is
+  providing **zero** backstop for this connection, only whatever the Python code itself
+  gets right. Point this worker at a restricted role (`mou7asib_app`, or its own
+  equivalent) before trusting it the way `apps/web` is now trusted.
 - **Grounding confidence thresholds (`MATCH_SCORE_FLOOR` in `grounding.py`,
   `LOW_CONFIDENCE_THRESHOLD` in `apps/web/lib/confidence.ts`) are documented placeholders**,
   not tuned against real accuracy data — there isn't any yet. Revisit once D2 has run

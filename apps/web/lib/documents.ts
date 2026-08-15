@@ -1,13 +1,13 @@
 import path from "node:path";
 import { Prisma } from "@mou7asib/db";
-import { DEMO_TENANT_ID } from "@/lib/tenant";
 
 // Every query against Document (and every join that needs to respect a
-// document's visibility) must include this — centralizes both the tenant
-// scope and the soft-delete filter so neither can be forgotten at a new call
-// site, same spirit as lib/tenant.ts centralizing DEMO_TENANT_ID itself.
-export function visibleDocumentWhere(): Prisma.DocumentWhereInput {
-  return { tenantId: DEMO_TENANT_ID, deletedAt: null };
+// document's visibility) must include this — centralizes the soft-delete filter so it
+// can't be forgotten at a new call site. tenantId is now the caller's real session tenant
+// (phase 1), not the D2 demo constant — RLS (packages/db's withTenant) is the backstop,
+// this explicit filter is the primary application-level control, CLAUDE.md §8.1 wants both.
+export function visibleDocumentWhere(tenantId: string): Prisma.DocumentWhereInput {
+  return { tenantId, deletedAt: null };
 }
 
 // Shared by the image/preview Route Handlers: resolves a Document's stored

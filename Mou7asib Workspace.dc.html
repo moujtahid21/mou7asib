@@ -1,0 +1,1002 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet data-dc-atomics>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+--bg:#f8fafc;--surface:#ffffff;--surface2:#f1f5f9;--surface3:#f8fafc;--border:#e2e8f0;--border2:#cbd5e1;
+--fg:#0f172a;--fg2:#475569;--fg3:#94a3b8;--pos:#059669;--posbg:#ecfdf5;--neg:#e11d48;--negbg:#fff1f2;
+--warn:#b45309;--warnbg:#fffbeb;--ai:#6d28d9;--aibg:#f5f3ff;--aiborder:#ddd6fe;--shadow:0 1px 2px rgba(15,23,42,.06),0 1px 3px rgba(15,23,42,.04);
+}
+:root[data-m7-theme="dark"]{
+--bg:#020617;--surface:#0f172a;--surface2:#1a2437;--surface3:#131d31;--border:#243349;--border2:#334155;
+--fg:#f1f5f9;--fg2:#94a3b8;--fg3:#64748b;--pos:#34d399;--posbg:#052e23;--neg:#fb7185;--negbg:#3f0d1c;
+--warn:#fbbf24;--warnbg:#3a2a06;--ai:#a78bfa;--aibg:#1f1b3d;--aiborder:#4c1d95;--shadow:0 1px 2px rgba(0,0,0,.4);
+}
+body{margin:0;background:var(--bg);color:var(--fg);font-family:Geist,ui-sans-serif,system-ui,sans-serif;-webkit-font-smoothing:antialiased}
+a{color:var(--ai);text-decoration:none}
+a:hover{color:var(--fg)}
+input,button,select,textarea{font:inherit;color:inherit}
+*::-webkit-scrollbar{width:10px;height:10px}
+*::-webkit-scrollbar-thumb{background:var(--border2);border-radius:8px;border:3px solid transparent;background-clip:content-box}
+@media (prefers-reduced-motion:reduce){*{transition-duration:.01ms!important;animation-duration:.01ms!important}}
+</style>
+</helmet>
+
+<div style="display:flex;height:100vh;min-height:640px;min-width:1360px;overflow:hidden;background:var(--bg)">
+
+  <!-- ══ SIDEBAR ══ -->
+  <aside style="flex:none;width:{{ sidebarWidth }};display:flex;flex-direction:column;background:var(--surface);border-inline-end:1px solid var(--border);transition:width .18s ease">
+    <div style="display:flex;align-items:center;gap:10px;padding:14px 14px 12px;border-bottom:1px solid var(--border)">
+      <div style="flex:none;width:32px;height:32px;border-radius:9px;background:var(--fg);color:var(--bg);display:grid;place-items:center;font-weight:700;font-size:14px;letter-spacing:-.02em">m7</div>
+      <sc-if value="{{ sidebarOpen }}" hint-placeholder-val="{{ true }}">
+        <button onClick="{{ toggleOrg }}" style="flex:1;min-width:0;display:flex;align-items:center;gap:8px;background:transparent;border:0;padding:0;cursor:pointer;text-align:start">
+          <span style="flex:1;min-width:0">
+            <span style="display:block;font-size:13px;font-weight:600;line-height:1.2;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Atlas Négoce SARL</span>
+            <span style="display:block;font-size:11px;color:var(--fg3);font-family:'Geist Mono',ui-monospace,monospace">ICE 0027•••4913</span>
+          </span>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="color:var(--fg3);flex:none"><path d="M8 10l4-4 4 4M8 14l4 4 4-4"></path></svg>
+        </button>
+      </sc-if>
+    </div>
+
+    <sc-if value="{{ orgOpen }}" hint-placeholder-val="{{ false }}">
+      <div style="margin:8px;padding:6px;border:1px solid var(--border);border-radius:10px;background:var(--surface2)">
+        <sc-for list="{{ orgs }}" as="org" hint-placeholder-count="3">
+          <button onClick="{{ org.pick }}" style="display:flex;width:100%;align-items:center;justify-content:space-between;gap:8px;background:transparent;border:0;border-radius:7px;padding:7px 8px;cursor:pointer;font-size:12.5px;text-align:start">
+            <span>{{ org.name }}</span>
+            <span style="font-family:'Geist Mono',ui-monospace,monospace;font-size:10.5px;color:var(--fg3)">{{ org.regime }}</span>
+          </button>
+        </sc-for>
+      </div>
+    </sc-if>
+
+    <nav style="flex:1;overflow-y:auto;padding:10px 8px;display:flex;flex-direction:column;gap:2px">
+      <sc-for list="{{ nav }}" as="item" hint-placeholder-count="6">
+        <button onClick="{{ item.go }}" title="{{ item.label }}" style="display:flex;align-items:center;gap:10px;width:100%;padding:9px 10px;border:0;border-radius:9px;cursor:pointer;background:{{ item.bg }};color:{{ item.fg }};font-size:13px;font-weight:{{ item.weight }};text-align:start">
+          <span style="flex:none;display:grid;place-items:center;width:20px;height:20px" data-m7-icon="{{ item.icon }}">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="{{ item.path }}"></path></svg>
+          </span>
+          <sc-if value="{{ sidebarOpen }}" hint-placeholder-val="{{ true }}">
+            <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ item.label }}</span>
+          </sc-if>
+          <sc-if value="{{ item.showBadge }}" hint-placeholder-val="{{ false }}">
+            <span style="flex:none;min-width:20px;padding:1px 6px;border-radius:999px;background:var(--aibg);color:var(--ai);border:1px solid var(--aiborder);font-family:'Geist Mono',ui-monospace,monospace;font-size:10.5px;font-weight:600;text-align:center">{{ item.badge }}</span>
+          </sc-if>
+        </button>
+      </sc-for>
+    </nav>
+
+    <div style="padding:10px 8px;border-top:1px solid var(--border);display:flex;flex-direction:column;gap:2px">
+      <button onClick="{{ toggleTheme }}" style="display:flex;align-items:center;gap:10px;padding:9px 10px;border:0;border-radius:9px;background:transparent;color:var(--fg2);cursor:pointer;font-size:13px;text-align:start">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="flex:none"><circle cx="12" cy="12" r="4"></circle><path d="M12 3v2M12 19v2M3 12h2M19 12h2M5.6 5.6l1.4 1.4M17 17l1.4 1.4M18.4 5.6L17 7M7 17l-1.4 1.4"></path></svg>
+        <sc-if value="{{ sidebarOpen }}" hint-placeholder-val="{{ true }}"><span>{{ themeLabel }}</span></sc-if>
+      </button>
+      <button onClick="{{ toggleSidebar }}" style="display:flex;align-items:center;gap:10px;padding:9px 10px;border:0;border-radius:9px;background:transparent;color:var(--fg2);cursor:pointer;font-size:13px;text-align:start">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="flex:none"><path d="M4 5h16M4 12h10M4 19h16"></path></svg>
+        <sc-if value="{{ sidebarOpen }}" hint-placeholder-val="{{ true }}"><span>Réduire le menu</span></sc-if>
+      </button>
+    </div>
+  </aside>
+
+  <!-- ══ MAIN ══ -->
+  <div style="flex:1;min-width:0;display:flex;flex-direction:column">
+
+    <header style="flex:none;display:flex;align-items:center;gap:14px;padding:12px 20px;background:var(--surface);border-bottom:1px solid var(--border)">
+      <div style="min-width:0;flex:0 1 auto">
+        <h1 style="margin:0;font-size:15px;font-weight:600;letter-spacing:-.01em;white-space:nowrap">{{ viewTitle }}</h1>
+        <p style="margin:2px 0 0;font-size:11.5px;color:var(--fg3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ viewSub }}</p>
+      </div>
+      <button onClick="{{ openPalette }}" style="margin-inline-start:auto;display:flex;align-items:center;gap:9px;padding:7px 10px 7px 9px;border:1px solid var(--border);border-radius:9px;background:var(--surface2);color:var(--fg3);cursor:pointer;font-size:12.5px;width:280px">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><circle cx="11" cy="11" r="6"></circle><path d="M16 16l4 4"></path></svg>
+        <span style="flex:1;text-align:start">Rechercher ou commander…</span>
+        <kbd style="font-family:'Geist Mono',ui-monospace,monospace;font-size:10.5px;border:1px solid var(--border2);border-radius:5px;padding:1px 5px;background:var(--surface)">⌘K</kbd>
+      </button>
+      <div style="display:flex;align-items:center;gap:8px">
+        <span style="display:flex;align-items:center;gap:6px;padding:5px 9px;border:1px solid var(--border);border-radius:999px;font-size:11.5px;color:var(--fg2)">
+          <span style="width:6px;height:6px;border-radius:999px;background:var(--pos)"></span>Exercice 2026 · période 07 ouverte
+        </span>
+        <button onClick="{{ toggleCopilot }}" style="display:flex;align-items:center;gap:7px;padding:7px 11px;border:1px solid var(--aiborder);border-radius:9px;background:var(--aibg);color:var(--ai);cursor:pointer;font-size:12.5px;font-weight:600">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9zM18.5 16.5l.8 2.2 2.2.8-2.2.8-.8 2.2-.8-2.2-2.2-.8 2.2-.8z"></path></svg>
+          Copilote
+        </button>
+      </div>
+    </header>
+
+    <main style="flex:1;overflow-y:auto;padding:20px 20px 40px">
+
+      <!-- ── TABLEAU DE BORD ── -->
+      <sc-if value="{{ isDash }}" hint-placeholder-val="{{ true }}">
+        <div style="display:flex;flex-direction:column;gap:16px;max-width:1180px">
+
+          <div style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px">
+            <sc-for list="{{ kpis }}" as="k" hint-placeholder-count="4">
+              <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px;box-shadow:var(--shadow)">
+                <div style="display:flex;align-items:center;justify-content:space-between;gap:8px">
+                  <span style="font-size:11.5px;font-weight:500;color:var(--fg2);text-transform:uppercase;letter-spacing:.04em">{{ k.label }}</span>
+                  <span style="font-size:10.5px;font-family:'Geist Mono',ui-monospace,monospace;color:{{ k.deltaColor }}">{{ k.delta }}</span>
+                </div>
+                <div style="margin-top:10px;display:flex;align-items:baseline;gap:6px">
+                  <span style="font-family:'Geist Mono',ui-monospace,monospace;font-variant-numeric:tabular-nums;font-size:24px;font-weight:600;letter-spacing:-.02em;color:{{ k.color }}">{{ k.value }}</span>
+                  <span style="font-size:11.5px;color:var(--fg3);font-family:'Geist Mono',ui-monospace,monospace">{{ k.unit }}</span>
+                </div>
+                <div style="margin-top:8px;font-size:11.5px;color:{{ k.subColor }};display:flex;align-items:center;gap:5px">
+                  <sc-if value="{{ k.alert }}" hint-placeholder-val="{{ false }}">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M12 4l9 16H3zM12 10v4M12 17v.5"></path></svg>
+                  </sc-if>
+                  <span>{{ k.sub }}</span>
+                </div>
+              </div>
+            </sc-for>
+          </div>
+
+          <div style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px">
+            <sc-for list="{{ minis }}" as="m" hint-placeholder-count="4">
+              <div style="background:var(--surface3);border:1px solid var(--border);border-radius:10px;padding:11px 13px;display:flex;align-items:center;justify-content:space-between;gap:10px">
+                <span style="font-size:11.5px;color:var(--fg2)">{{ m.label }}</span>
+                <span style="font-family:'Geist Mono',ui-monospace,monospace;font-variant-numeric:tabular-nums;font-size:13px;font-weight:600;color:{{ m.color }}">{{ m.value }}</span>
+              </div>
+            </sc-for>
+          </div>
+
+          <div style="display:grid;grid-template-columns:minmax(0,1.55fr) minmax(0,1fr);gap:12px;align-items:start">
+
+            <!-- cash flow chart -->
+            <section style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:16px;box-shadow:var(--shadow)">
+              <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px">
+                <div>
+                  <h2 style="margin:0;font-size:13.5px;font-weight:600">Trésorerie — 6 mois &amp; prévision 30 jours</h2>
+                  <p style="margin:3px 0 0;font-size:11.5px;color:var(--fg3)">Compte 5141 Banque + 5161 Caisse · MAD</p>
+                </div>
+                <div style="display:flex;align-items:center;gap:12px;font-size:11px;color:var(--fg2)">
+                  <span style="display:flex;align-items:center;gap:5px"><span style="width:14px;height:2px;background:var(--fg)"></span>Réalisé</span>
+                  <span style="display:flex;align-items:center;gap:5px"><span style="width:14px;height:0;border-top:2px dashed var(--ai)"></span>Prévision IA</span>
+                </div>
+              </div>
+              <svg viewBox="0 0 720 230" style="width:100%;height:236px;margin-top:8px;overflow:visible" role="img" aria-label="Courbe de trésorerie sur six mois avec prévision">
+                <g stroke="var(--border)" stroke-width="1">
+                  <line x1="30" y1="190" x2="700" y2="190"></line>
+                  <line x1="30" y1="150" x2="700" y2="150" stroke-dasharray="3 5"></line>
+                  <line x1="30" y1="110" x2="700" y2="110" stroke-dasharray="3 5"></line>
+                  <line x1="30" y1="70" x2="700" y2="70" stroke-dasharray="3 5"></line>
+                  <line x1="30" y1="30" x2="700" y2="30" stroke-dasharray="3 5"></line>
+                </g>
+                <g font-family="Geist Mono,ui-monospace,monospace" font-size="9.5" fill="var(--fg3)">
+                  <text x="30" y="204">Fév</text><text x="142" y="204">Mar</text><text x="254" y="204">Avr</text>
+                  <text x="366" y="204">Mai</text><text x="478" y="204">Juin</text><text x="590" y="204">Juil</text>
+                  <text x="660" y="204" fill="var(--ai)">Août*</text>
+                  <text x="0" y="194">300k</text><text x="0" y="34">520k</text>
+                </g>
+                <polygon points="40,181 152,148 264,160 376,116 488,90 600,54 600,190 40,190" fill="var(--pos)" opacity="0.10"></polygon>
+                <polygon points="600,54 690,10 690,80" fill="var(--ai)" opacity="0.14"></polygon>
+                <polyline points="40,181 152,148 264,160 376,116 488,90 600,54" fill="none" stroke="var(--fg)" stroke-width="2" stroke-linejoin="round"></polyline>
+                <polyline points="600,54 690,35" fill="none" stroke="var(--ai)" stroke-width="2" stroke-dasharray="5 4"></polyline>
+                <g fill="var(--surface)" stroke="var(--fg)" stroke-width="2">
+                  <circle cx="40" cy="181" r="3"></circle><circle cx="152" cy="148" r="3"></circle><circle cx="264" cy="160" r="3"></circle>
+                  <circle cx="376" cy="116" r="3"></circle><circle cx="488" cy="90" r="3"></circle><circle cx="600" cy="54" r="4"></circle>
+                </g>
+                <circle cx="690" cy="35" r="4" fill="var(--ai)"></circle>
+                <g font-family="Geist Mono,ui-monospace,monospace" font-size="10.5" font-weight="600">
+                  <text x="576" y="42" fill="var(--fg)">486k</text>
+                  <text x="662" y="26" fill="var(--ai)">512k</text>
+                </g>
+              </svg>
+              <p style="margin:6px 0 0;font-size:11px;color:var(--fg3)">* Prévision au 31/08 : 512k MAD (intervalle 470k–548k). Hypothèses : encaissement des créances à échéance, TVA 07 payée le 20/08. <span style="color:var(--ai)">Non comptabilisé.</span></p>
+            </section>
+
+            <!-- needs attention -->
+            <section style="background:var(--surface);border:1px solid var(--border);border-radius:12px;box-shadow:var(--shadow);overflow:hidden">
+              <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:14px 14px 10px;border-bottom:1px solid var(--border)">
+                <h2 style="margin:0;font-size:13.5px;font-weight:600">À traiter</h2>
+                <span style="font-family:'Geist Mono',ui-monospace,monospace;font-size:11px;color:var(--fg3)">{{ attentionCount }} éléments</span>
+              </div>
+              <div style="display:flex;flex-direction:column">
+                <sc-for list="{{ attention }}" as="a" hint-placeholder-count="4">
+                  <div style="padding:12px 14px;border-bottom:1px solid var(--border);display:flex;flex-direction:column;gap:7px">
+                    <div style="display:flex;align-items:flex-start;gap:9px">
+                      <span style="flex:none;margin-top:2px;width:8px;height:8px;border-radius:999px;background:{{ a.dot }}"></span>
+                      <div style="flex:1;min-width:0">
+                        <p style="margin:0;font-size:12.5px;font-weight:500;line-height:1.35">{{ a.title }}</p>
+                        <p style="margin:3px 0 0;font-size:11.5px;color:var(--fg2);line-height:1.4">{{ a.detail }}</p>
+                        <p style="margin:4px 0 0;font-family:'Geist Mono',ui-monospace,monospace;font-size:10.5px;color:var(--fg3)">{{ a.meta }}</p>
+                      </div>
+                    </div>
+                    <div style="display:flex;gap:6px;padding-inline-start:17px">
+                      <button onClick="{{ a.primary }}" style="padding:5px 9px;border:1px solid var(--aiborder);border-radius:7px;background:var(--aibg);color:var(--ai);font-size:11.5px;font-weight:600;cursor:pointer">{{ a.primaryLabel }}</button>
+                      <button onClick="{{ a.dismiss }}" style="padding:5px 9px;border:1px solid var(--border);border-radius:7px;background:transparent;color:var(--fg2);font-size:11.5px;cursor:pointer">Ignorer</button>
+                    </div>
+                  </div>
+                </sc-for>
+                <sc-if value="{{ attentionEmpty }}" hint-placeholder-val="{{ false }}">
+                  <p style="margin:0;padding:22px 14px;font-size:12px;color:var(--fg3);text-align:center">Rien à traiter. Les anomalies réapparaîtront après la prochaine synchronisation bancaire.</p>
+                </sc-if>
+              </div>
+            </section>
+          </div>
+        </div>
+      </sc-if>
+
+      <!-- ── RAPPROCHEMENT ── -->
+      <sc-if value="{{ isRec }}" hint-placeholder-val="{{ false }}">
+        <div style="display:flex;flex-direction:column;gap:14px;max-width:1180px">
+
+          <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;background:var(--surface);border:1px solid var(--border);border-radius:11px;padding:10px 12px">
+            <span style="font-size:12px;color:var(--fg2)">Relevé <span style="font-family:'Geist Mono',ui-monospace,monospace">BMCE_072026.csv</span> · 42 lignes importées</span>
+            <span style="width:1px;height:18px;background:var(--border)"></span>
+            <sc-for list="{{ recFilters }}" as="f" hint-placeholder-count="3">
+              <button onClick="{{ f.pick }}" style="padding:5px 10px;border:1px solid {{ f.border }};border-radius:999px;background:{{ f.bg }};color:{{ f.fg }};font-size:11.5px;font-weight:500;cursor:pointer">{{ f.label }}</button>
+            </sc-for>
+            <button onClick="{{ approveAllHigh }}" style="margin-inline-start:auto;display:flex;align-items:center;gap:7px;padding:7px 12px;border:1px solid var(--aiborder);border-radius:9px;background:var(--aibg);color:var(--ai);font-size:12px;font-weight:600;cursor:pointer">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12l5 5L20 6"></path></svg>
+            Lettrer les {{ highCount }} correspondances ≥ 90 %</button>
+          </div>
+
+          <div style="display:grid;grid-template-columns:minmax(0,1fr) 44px minmax(0,1fr);gap:0;align-items:start;background:var(--surface);border:1px solid var(--border);border-radius:12px;overflow:hidden;box-shadow:var(--shadow)">
+            <div style="border-inline-end:1px solid var(--border)">
+              <div style="padding:11px 14px;border-bottom:1px solid var(--border);background:var(--surface3)">
+                <h2 style="margin:0;font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:var(--fg2)">Écritures bancaires</h2>
+              </div>
+              <sc-for list="{{ recRows }}" as="r" hint-placeholder-count="5">
+                <div style="padding:12px 14px;border-bottom:1px solid var(--border);background:{{ r.rowBg }};min-height:78px">
+                  <div style="display:flex;align-items:baseline;justify-content:space-between;gap:10px">
+                    <span style="font-size:12.5px;font-weight:500">{{ r.label }}</span>
+                    <span style="font-family:'Geist Mono',ui-monospace,monospace;font-variant-numeric:tabular-nums;font-size:13px;font-weight:600;color:{{ r.amountColor }}">{{ r.amount }}</span>
+                  </div>
+                  <p style="margin:5px 0 0;font-family:'Geist Mono',ui-monospace,monospace;font-size:10.5px;color:var(--fg3)">{{ r.bankMeta }}</p>
+                </div>
+              </sc-for>
+            </div>
+
+            <div>
+              <div style="height:41px;border-bottom:1px solid var(--border);background:var(--surface3)"></div>
+              <sc-for list="{{ recRows }}" as="r" hint-placeholder-count="5">
+                <div style="min-height:78px;padding:12px 0;border-bottom:1px solid var(--border);background:{{ r.rowBg }};display:grid;place-items:center">
+                  <span style="display:grid;place-items:center;width:26px;height:26px;border-radius:999px;border:1px solid {{ r.linkBorder }};background:{{ r.linkBg }};color:{{ r.linkFg }}">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="{{ r.linkPath }}"></path></svg>
+                  </span>
+                </div>
+              </sc-for>
+            </div>
+
+            <div>
+              <div style="padding:11px 14px;border-bottom:1px solid var(--border);background:var(--surface3)">
+                <h2 style="margin:0;font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:var(--fg2)">Pièce proposée · lettrage</h2>
+              </div>
+              <sc-for list="{{ recRows }}" as="r" hint-placeholder-count="5">
+                <div style="padding:12px 14px;border-bottom:1px solid var(--border);background:{{ r.rowBg }};min-height:78px;display:flex;align-items:flex-start;gap:12px">
+                  <div style="flex:1;min-width:0">
+                    <div style="display:flex;align-items:center;gap:7px;flex-wrap:wrap">
+                      <span style="font-size:12.5px;font-weight:500">{{ r.piece }}</span>
+                      <span style="padding:1px 6px;border-radius:5px;border:1px solid {{ r.confBorder }};background:{{ r.confBg }};color:{{ r.confFg }};font-family:'Geist Mono',ui-monospace,monospace;font-size:10px;font-weight:600">{{ r.confLabel }}</span>
+                      <sc-if value="{{ r.done }}" hint-placeholder-val="{{ false }}">
+                        <span style="font-size:10.5px;color:var(--pos);font-weight:600">✓ lettré (brouillon)</span>
+                      </sc-if>
+                    </div>
+                    <p style="margin:5px 0 0;font-family:'Geist Mono',ui-monospace,monospace;font-size:10.5px;color:var(--fg3)">{{ r.pieceMeta }}</p>
+                    <p style="margin:4px 0 0;font-size:11px;color:var(--fg2);display:flex;align-items:center;gap:5px">
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--ai)" stroke-width="1.5" stroke-linejoin="round"><path d="M12 3l2 5.5L19.5 11 14 13 12 19 10 13 4.5 11 10 8.5z"></path></svg>
+                      {{ r.reason }}
+                    </p>
+                  </div>
+                  <sc-if value="{{ r.pending }}" hint-placeholder-val="{{ true }}">
+                    <div style="flex:none;display:flex;flex-direction:column;gap:5px">
+                      <button onClick="{{ r.approve }}" style="padding:5px 10px;border:1px solid var(--aiborder);border-radius:7px;background:var(--aibg);color:var(--ai);font-size:11.5px;font-weight:600;cursor:pointer">Valider</button>
+                      <button onClick="{{ r.reject }}" style="padding:5px 10px;border:1px solid var(--border);border-radius:7px;background:transparent;color:var(--fg2);font-size:11.5px;cursor:pointer">Rejeter</button>
+                    </div>
+                  </sc-if>
+                </div>
+              </sc-for>
+            </div>
+          </div>
+          <p style="margin:0;font-size:11.5px;color:var(--fg3)">Le lettrage validé reste en brouillon jusqu'à la validation du journal de banque. Aucune écriture n'est passée par l'IA — CLAUDE.md §2 règle 5.</p>
+        </div>
+      </sc-if>
+
+      <!-- ── RÉCEPTION / INBOX ── -->
+      <sc-if value="{{ isInbox }}" hint-placeholder-val="{{ false }}">
+        <div style="display:flex;flex-direction:column;gap:14px;max-width:1180px">
+
+          <div style="display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:12px;align-items:stretch">
+            <div style="border:1.5px dashed var(--border2);border-radius:12px;background:var(--surface3);padding:18px;display:flex;align-items:center;gap:16px">
+              <span style="flex:none;display:grid;place-items:center;width:44px;height:44px;border-radius:12px;background:var(--surface);border:1px solid var(--border);color:var(--fg2)">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4m0 0L8 8m4-4l4 4M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2"></path></svg>
+              </span>
+              <div style="flex:1;min-width:0">
+                <p style="margin:0;font-size:13px;font-weight:600">Déposez vos factures ici</p>
+                <p style="margin:3px 0 0;font-size:11.5px;color:var(--fg2)">PDF, JPEG, PNG, HEIC, XLSX, CSV — 15 Mo max. Type vérifié par signature de fichier, analyse antivirus avant traitement.</p>
+              </div>
+              <button onClick="{{ simulateUpload }}" style="flex:none;padding:8px 13px;border:1px solid var(--border2);border-radius:9px;background:var(--surface);color:var(--fg);font-size:12px;font-weight:600;cursor:pointer">Parcourir…</button>
+            </div>
+            <div style="border:1px solid var(--border);border-radius:12px;background:var(--surface);padding:13px 14px;display:flex;flex-direction:column;justify-content:center;gap:8px">
+              <sc-for list="{{ queueStats }}" as="q" hint-placeholder-count="3">
+                <div style="display:flex;align-items:center;justify-content:space-between;gap:10px">
+                  <span style="font-size:11.5px;color:var(--fg2)">{{ q.label }}</span>
+                  <span style="font-family:'Geist Mono',ui-monospace,monospace;font-size:12.5px;font-weight:600;color:{{ q.color }}">{{ q.value }}</span>
+                </div>
+              </sc-for>
+            </div>
+          </div>
+
+          <div style="display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.02fr);gap:12px;align-items:start">
+
+            <!-- document preview -->
+            <section style="background:var(--surface);border:1px solid var(--border);border-radius:12px;box-shadow:var(--shadow);overflow:hidden">
+              <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:11px 14px;border-bottom:1px solid var(--border)">
+                <span style="font-family:'Geist Mono',ui-monospace,monospace;font-size:11.5px">FACT-2026-0731-ONEE.pdf</span>
+                <span style="font-size:11px;color:var(--fg3)">page 1/1 · texte extrait sans OCR</span>
+              </div>
+              <div style="position:relative;margin:14px;aspect-ratio:1/1.3;background:var(--surface2);border:1px solid var(--border);border-radius:6px;overflow:hidden">
+                <div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;color:var(--fg3)">
+                  <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"><path d="M6 3h8l4 4v14H6z"></path><path d="M14 3v4h4"></path><path d="M9 12h6M9 15h6M9 18h4"></path></svg>
+                  <span style="font-size:11px">Aperçu du document (placeholder)</span>
+                </div>
+                <sc-for list="{{ boxes }}" as="b" hint-placeholder-count="4">
+                  <div style="position:absolute;left:{{ b.left }};top:{{ b.top }};width:{{ b.width }};height:{{ b.height }};border:2px solid {{ b.color }};border-radius:2px">
+                    <span style="position:absolute;top:-8px;inset-inline-start:0;transform:translateY(-100%);padding:1px 4px;border-radius:4px;background:{{ b.color }};color:#fff;font-family:'Geist Mono',ui-monospace,monospace;font-size:9px;white-space:nowrap">{{ b.label }}</span>
+                  </div>
+                </sc-for>
+              </div>
+              <div style="display:flex;gap:14px;padding:0 14px 14px;font-size:11px;color:var(--fg2);flex-wrap:wrap">
+                <span style="display:flex;align-items:center;gap:5px"><span style="width:10px;height:10px;border:2px solid var(--pos)"></span>Confiant</span>
+                <span style="display:flex;align-items:center;gap:5px"><span style="width:10px;height:10px;border:2px solid #f59e0b"></span>Faible confiance</span>
+                <span style="display:flex;align-items:center;gap:5px"><span style="width:10px;height:10px;border:2px solid #3b82f6"></span>Corrigé</span>
+              </div>
+            </section>
+
+            <!-- extracted fields -->
+            <section style="background:var(--surface);border:1px solid var(--border);border-radius:12px;box-shadow:var(--shadow);overflow:hidden">
+              <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:11px 14px;border-bottom:1px solid var(--border)">
+                <h2 style="margin:0;font-size:13px;font-weight:600">Champs extraits</h2>
+                <span style="padding:2px 7px;border-radius:6px;background:var(--aibg);border:1px solid var(--aiborder);color:var(--ai);font-size:10.5px;font-weight:600">Brouillon — non comptabilisé</span>
+              </div>
+
+              <sc-if value="{{ arithmeticWarn }}" hint-placeholder-val="{{ false }}">
+                <p role="alert" style="margin:12px 14px 0;padding:9px 11px;border:1px solid var(--neg);border-radius:8px;background:var(--negbg);color:var(--neg);font-size:11.5px">HT + TVA ≠ TTC sur ce document — à vérifier avant toute utilisation.</p>
+              </sc-if>
+
+              <div style="padding:6px 6px 0">
+                <sc-for list="{{ fields }}" as="f" hint-placeholder-count="8">
+                  <div style="display:grid;grid-template-columns:132px minmax(0,1fr);gap:10px;align-items:center;padding:6px 8px;border-radius:8px;background:{{ f.rowBg }}">
+                    <label style="font-size:11.5px;color:var(--fg2);display:flex;align-items:center;gap:5px">
+                      <sc-if value="{{ f.ai }}" hint-placeholder-val="{{ true }}">
+                        <span title="{{ f.tooltip }}" style="flex:none;display:grid;place-items:center;cursor:help">
+                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--ai)" stroke-width="1.5" stroke-linejoin="round"><path d="M12 3l2 5.5L19.5 11 14 13 12 19 10 13 4.5 11 10 8.5z"></path></svg>
+                        </span>
+                      </sc-if>
+                      <span>{{ f.label }}</span>
+                    </label>
+                    <div style="display:flex;align-items:center;gap:7px;min-width:0">
+                      <input value="{{ f.value }}" onChange="{{ f.edit }}" style="flex:1;min-width:0;padding:5px 8px;border:1px solid {{ f.inputBorder }};border-radius:7px;background:var(--surface);font-family:{{ f.font }};font-variant-numeric:tabular-nums;font-size:12px">
+                      <span style="flex:none;font-family:'Geist Mono',ui-monospace,monospace;font-size:10px;color:{{ f.confColor }};min-width:64px;text-align:end">{{ f.confText }}</span>
+                    </div>
+                  </div>
+                </sc-for>
+              </div>
+
+              <div style="margin:14px;padding:12px;border:1px solid var(--aiborder);border-radius:10px;background:var(--aibg)">
+                <div style="display:flex;align-items:center;gap:7px">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--ai)" stroke-width="1.5" stroke-linejoin="round"><path d="M12 3l2 5.5L19.5 11 14 13 12 19 10 13 4.5 11 10 8.5z"></path></svg>
+                  <span style="font-size:12px;font-weight:600;color:var(--ai)">Écriture proposée — journal ACH, 31/07/2026</span>
+                </div>
+                <table style="width:100%;margin-top:9px;border-collapse:collapse;font-family:'Geist Mono',ui-monospace,monospace;font-variant-numeric:tabular-nums;font-size:11.5px">
+                  <caption style="position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%)">Proposition d'écriture comptable</caption>
+                  <thead>
+                    <tr style="color:var(--fg2)">
+                      <th scope="col" style="text-align:start;padding:3px 0;font-weight:500">Compte</th>
+                      <th scope="col" style="text-align:start;padding:3px 0;font-weight:500">Libellé</th>
+                      <th scope="col" style="text-align:end;padding:3px 0;font-weight:500">Débit</th>
+                      <th scope="col" style="text-align:end;padding:3px 0;font-weight:500">Crédit</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <sc-for list="{{ postingLines }}" as="p" hint-placeholder-count="3">
+                      <tr style="border-top:1px solid var(--aiborder)">
+                        <td style="padding:4px 0">{{ p.account }}</td>
+                        <td style="padding:4px 6px;font-family:Geist,sans-serif;font-size:11px">{{ p.label }}</td>
+                        <td style="padding:4px 0;text-align:end">{{ p.debit }}</td>
+                        <td style="padding:4px 0;text-align:end">{{ p.credit }}</td>
+                      </tr>
+                    </sc-for>
+                  </tbody>
+                </table>
+                <p style="margin:8px 0 0;font-size:11px;color:var(--fg2)">Précédent utilisé : 14 factures ONEE comptabilisées en 61251 depuis janvier 2025. TVA 14 % — taux résolu au 31/07/2026.</p>
+              </div>
+
+              <div style="display:flex;gap:8px;padding:0 14px 14px">
+                <button onClick="{{ postDraft }}" style="flex:1;padding:9px;border:1px solid transparent;border-radius:9px;background:var(--fg);color:var(--bg);font-size:12.5px;font-weight:600;cursor:pointer">{{ postLabel }}</button>
+                <button onClick="{{ flagField }}" style="padding:9px 12px;border:1px solid var(--border);border-radius:9px;background:transparent;color:var(--fg2);font-size:12.5px;cursor:pointer">Signaler pour révision</button>
+              </div>
+            </section>
+          </div>
+        </div>
+      </sc-if>
+
+      <!-- ── ÉCRANS ACTUELS (recreation) ── -->
+      <sc-if value="{{ isLegacy }}" hint-placeholder-val="{{ false }}">
+        <div style="max-width:1180px">
+          <p style="margin:0 0 14px;font-size:12px;color:var(--fg2);max-width:760px">Reproduction fidèle des trois écrans livrés en D2 (<span style="font-family:'Geist Mono',ui-monospace,monospace">app/page.tsx</span>, <span style="font-family:'Geist Mono',ui-monospace,monospace">app/documents/page.tsx</span>, <span style="font-family:'Geist Mono',ui-monospace,monospace">documents/[id]/ReviewScreen.tsx</span>) — même largeur <span style="font-family:'Geist Mono',ui-monospace,monospace">max-w-md</span>, mêmes bordures slate, aucun style ajouté. Référence pour l'écart avec les maquettes ci-dessus.</p>
+          <div style="display:flex;gap:16px;align-items:flex-start;flex-wrap:wrap">
+
+            <div style="width:360px;background:#fff;color:#0f172a;border:1px solid #e2e8f0;border-radius:10px;overflow:hidden">
+              <div style="padding:4px 10px;background:#f8fafc;border-bottom:1px solid #e2e8f0;font-family:'Geist Mono',ui-monospace,monospace;font-size:10px;color:#64748b">/</div>
+              <div style="padding:24px">
+                <h1 style="margin:0;font-size:24px;font-weight:600">mou7asib</h1>
+                <p style="margin:8px 0 0;font-size:14px;color:#475569">Photographiez une facture pour voir les champs extraits.</p>
+                <div style="margin-top:32px;border-radius:4px;background:#0f172a;color:#fff;padding:12px;text-align:center;font-size:14px;font-weight:500">Photographier une facture</div>
+                <div style="margin-top:12px;border-radius:4px;border:1px solid #cbd5e1;padding:12px;text-align:center;font-size:14px;font-weight:500">Documents précédents</div>
+              </div>
+            </div>
+
+            <div style="width:360px;background:#fff;color:#0f172a;border:1px solid #e2e8f0;border-radius:10px;overflow:hidden">
+              <div style="padding:4px 10px;background:#f8fafc;border-bottom:1px solid #e2e8f0;font-family:'Geist Mono',ui-monospace,monospace;font-size:10px;color:#64748b">/documents</div>
+              <div style="padding:24px">
+                <h1 style="margin:0;font-size:20px;font-weight:600">Documents précédents</h1>
+                <div style="margin-top:16px;display:flex;gap:8px">
+                  <span style="flex:1;border:1px solid #cbd5e1;border-radius:4px;padding:6px 8px;font-size:14px;color:#94a3b8">Rechercher un fichier…</span>
+                  <span style="border:1px solid #cbd5e1;border-radius:4px;padding:6px 8px;font-size:14px">Tous ▾</span>
+                </div>
+                <sc-for list="{{ legacyDocs }}" as="d" hint-placeholder-count="3">
+                  <div style="margin-top:8px;border:1px solid #cbd5e1;border-radius:4px;padding:12px">
+                    <div style="display:flex;justify-content:space-between;gap:12px;font-size:14px">
+                      <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ d.name }}</span>
+                      <span style="flex:none;color:#64748b">{{ d.status }}</span>
+                    </div>
+                    <p style="margin:4px 0 0;font-size:12px;color:#94a3b8">{{ d.date }}</p>
+                    <p style="margin:8px 0 0;font-size:12px;font-weight:500;color:#b91c1c;text-decoration:underline">Supprimer</p>
+                  </div>
+                </sc-for>
+                <p style="margin:24px 0 0;font-size:14px;font-weight:500">+ Nouvelle facture</p>
+              </div>
+            </div>
+
+            <div style="width:420px;background:#fff;color:#0f172a;border:1px solid #e2e8f0;border-radius:10px;overflow:hidden">
+              <div style="padding:4px 10px;background:#f8fafc;border-bottom:1px solid #e2e8f0;font-family:'Geist Mono',ui-monospace,monospace;font-size:10px;color:#64748b">/documents/[id]</div>
+              <div style="padding:16px">
+                <h1 style="margin:0 0 0 8px;font-size:20px;font-weight:600">Facture extraite</h1>
+                <div style="position:relative;margin-top:16px;aspect-ratio:1/1.3;background:#f1f5f9;border-radius:4px">
+                  <div style="position:absolute;inset:0;display:grid;place-items:center;font-size:12px;color:#94a3b8">Document scanné</div>
+                  <div style="position:absolute;left:12%;top:16%;width:34%;height:5%;border:2px solid #10b981"></div>
+                  <div style="position:absolute;left:58%;top:44%;width:28%;height:5%;border:2px solid #f59e0b"></div>
+                  <div style="position:absolute;left:58%;top:70%;width:28%;height:5%;border:2px solid #10b981"></div>
+                </div>
+                <table style="width:100%;margin-top:16px;border-collapse:collapse;font-size:14px">
+                  <caption style="position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%)">Champs extraits de la facture</caption>
+                  <thead><tr style="border-bottom:1px solid #cbd5e1"><th scope="col" style="padding:8px;text-align:start;font-weight:500;color:#475569">Champ</th><th scope="col" style="padding:8px;text-align:start;font-weight:500;color:#475569">Valeur</th></tr></thead>
+                  <tbody>
+                    <sc-for list="{{ legacyFields }}" as="lf" hint-placeholder-count="4">
+                      <tr style="border-bottom:1px solid #e2e8f0;vertical-align:top">
+                        <th scope="row" style="width:33%;padding:8px;text-align:start;font-size:12px;font-weight:400;color:#64748b">{{ lf.label }}</th>
+                        <td style="padding:8px">
+                          <div style="display:flex;gap:8px;align-items:center">
+                            <span style="flex:1;border:1px solid #cbd5e1;border-radius:4px;padding:4px 8px;font-size:14px">{{ lf.value }}</span>
+                            <span style="flex:none;border:1px solid #cbd5e1;border-radius:4px;padding:4px 8px;font-size:12px;font-weight:500">Enregistrer</span>
+                          </div>
+                          <sc-if value="{{ lf.low }}" hint-placeholder-val="{{ false }}">
+                            <span style="display:inline-block;margin-top:4px;border-radius:4px;background:#fef3c7;color:#92400e;padding:2px 6px;font-size:12px">Faible confiance — à vérifier</span>
+                          </sc-if>
+                        </td>
+                      </tr>
+                    </sc-for>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+      </sc-if>
+
+      <!-- ── placeholder views ── -->
+      <sc-if value="{{ isStub }}" hint-placeholder-val="{{ false }}">
+        <div style="max-width:640px;margin-top:40px;padding:28px;border:1px dashed var(--border2);border-radius:12px;background:var(--surface3);text-align:center">
+          <p style="margin:0;font-size:13.5px;font-weight:600">{{ viewTitle }} — non maquetté</p>
+          <p style="margin:7px 0 0;font-size:12px;color:var(--fg2)">Hors périmètre de cette itération. Les états de synthèse (Bilan, CPC, ESG, tableau de financement, ETIC) et l'export SIMPL viendront après validation des trois écrans ci-dessus.</p>
+        </div>
+      </sc-if>
+    </main>
+  </div>
+
+  <!-- ══ COPILOT ══ -->
+  <sc-if value="{{ copilotOpen }}" hint-placeholder-val="{{ true }}">
+    <aside style="flex:none;width:372px;display:flex;flex-direction:column;background:var(--surface);border-inline-start:1px solid var(--border)">
+      <div style="display:flex;align-items:center;gap:9px;padding:13px 14px;border-bottom:1px solid var(--border)">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--ai)" stroke-width="1.5" stroke-linejoin="round"><path d="M12 3l2 5.5L19.5 11 14 13 12 19 10 13 4.5 11 10 8.5z"></path></svg>
+        <span style="flex:1;font-size:13px;font-weight:600">Copilote comptable</span>
+        <button onClick="{{ toggleCopilot }}" style="border:0;background:transparent;color:var(--fg3);cursor:pointer;padding:2px;display:grid;place-items:center">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"></path></svg>
+        </button>
+      </div>
+
+      <div style="flex:1;overflow-y:auto;padding:13px;display:flex;flex-direction:column;gap:11px">
+        <sc-for list="{{ messages }}" as="msg" hint-placeholder-count="2">
+          <div style="align-self:{{ msg.align }};max-width:{{ msg.maxWidth }};width:{{ msg.width }}">
+            <sc-if value="{{ msg.isUser }}" hint-placeholder-val="{{ false }}">
+              <p style="margin:0;padding:8px 11px;border-radius:11px 11px 3px 11px;background:var(--surface2);border:1px solid var(--border);font-size:12.5px;line-height:1.45">{{ msg.text }}</p>
+            </sc-if>
+            <sc-if value="{{ msg.isText }}" hint-placeholder-val="{{ false }}">
+              <p style="margin:0;font-size:12.5px;line-height:1.5;color:var(--fg2)">{{ msg.text }}</p>
+            </sc-if>
+            <sc-if value="{{ msg.isCard }}" hint-placeholder-val="{{ true }}">
+              <div style="border:1px solid var(--aiborder);border-radius:11px;overflow:hidden;background:var(--surface)">
+                <div style="padding:10px 11px;background:var(--aibg)">
+                  <p style="margin:0;font-size:12px;font-weight:600;color:var(--ai)">{{ msg.title }}</p>
+                  <p style="margin:3px 0 0;font-size:11px;color:var(--fg2);line-height:1.4">{{ msg.note }}</p>
+                </div>
+                <table style="width:100%;border-collapse:collapse;font-size:11.5px">
+                  <tbody>
+                    <sc-for list="{{ msg.rows }}" as="row" hint-placeholder-count="3">
+                      <tr style="border-top:1px solid var(--border)">
+                        <td style="padding:7px 11px;line-height:1.35">{{ row.a }}</td>
+                        <td style="padding:7px 11px;text-align:end;font-family:'Geist Mono',ui-monospace,monospace;font-variant-numeric:tabular-nums;white-space:nowrap;color:{{ row.color }}">{{ row.b }}</td>
+                      </tr>
+                    </sc-for>
+                  </tbody>
+                </table>
+                <sc-if value="{{ msg.pending }}" hint-placeholder-val="{{ true }}">
+                  <div style="display:flex;gap:6px;padding:10px 11px;border-top:1px solid var(--border)">
+                    <button onClick="{{ msg.approve }}" style="flex:1;padding:6px;border:1px solid transparent;border-radius:7px;background:var(--ai);color:#fff;font-size:11.5px;font-weight:600;cursor:pointer">{{ msg.approveLabel }}</button>
+                    <button onClick="{{ msg.edit }}" style="padding:6px 10px;border:1px solid var(--border);border-radius:7px;background:transparent;color:var(--fg2);font-size:11.5px;cursor:pointer">Modifier</button>
+                    <button onClick="{{ msg.reject }}" style="padding:6px 10px;border:1px solid var(--border);border-radius:7px;background:transparent;color:var(--fg2);font-size:11.5px;cursor:pointer">Rejeter</button>
+                  </div>
+                </sc-if>
+                <sc-if value="{{ msg.resolved }}" hint-placeholder-val="{{ false }}">
+                  <p style="margin:0;padding:9px 11px;border-top:1px solid var(--border);font-size:11.5px;color:{{ msg.resolvedColor }}">{{ msg.resolvedText }}</p>
+                </sc-if>
+              </div>
+            </sc-if>
+          </div>
+        </sc-for>
+      </div>
+
+      <div style="flex:none;padding:11px 13px 13px;border-top:1px solid var(--border)">
+        <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:9px">
+          <sc-for list="{{ quickActions }}" as="qa" hint-placeholder-count="4">
+            <button onClick="{{ qa.run }}" style="padding:5px 9px;border:1px solid var(--border);border-radius:999px;background:var(--surface2);color:var(--fg2);font-size:11px;cursor:pointer">{{ qa.label }}</button>
+          </sc-for>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;border:1px solid var(--border2);border-radius:10px;padding:7px 8px 7px 11px;background:var(--surface)">
+          <input value="{{ draft }}" onChange="{{ setDraft }}" onKeyDown="{{ draftKey }}" placeholder="Demandez au copilote…" style="flex:1;min-width:0;border:0;outline:none;background:transparent;font-size:12.5px">
+          <button onClick="{{ send }}" style="flex:none;display:grid;place-items:center;width:28px;height:28px;border:0;border-radius:7px;background:var(--ai);color:#fff;cursor:pointer">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h13M12 5l7 7-7 7"></path></svg>
+          </button>
+        </div>
+        <p style="margin:7px 0 0;font-size:10.5px;color:var(--fg3);line-height:1.4">Le copilote propose, ne comptabilise pas. Chaque action validée reste en brouillon jusqu'à validation du journal.</p>
+      </div>
+    </aside>
+  </sc-if>
+
+  <!-- ══ ⌘K ══ -->
+  <sc-if value="{{ paletteOpen }}" hint-placeholder-val="{{ false }}">
+    <div onClick="{{ closePalette }}" style="position:fixed;inset:0;background:rgba(2,6,23,.45);backdrop-filter:blur(2px);display:flex;align-items:flex-start;justify-content:center;padding-top:14vh;z-index:50">
+      <div onClick="{{ stop }}" style="width:560px;max-width:92vw;background:var(--surface);border:1px solid var(--border2);border-radius:14px;box-shadow:0 24px 60px rgba(2,6,23,.35);overflow:hidden">
+        <div style="display:flex;align-items:center;gap:10px;padding:13px 14px;border-bottom:1px solid var(--border)">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--fg3)" stroke-width="1.5" stroke-linecap="round"><circle cx="11" cy="11" r="6"></circle><path d="M16 16l4 4"></path></svg>
+          <input value="{{ query }}" onChange="{{ setQuery }}" placeholder="Compte, tiers, facture, ou commande IA…" autofocus="{{ true }}" style="flex:1;border:0;outline:none;background:transparent;font-size:14px">
+          <kbd style="font-family:'Geist Mono',ui-monospace,monospace;font-size:10.5px;border:1px solid var(--border2);border-radius:5px;padding:1px 5px;color:var(--fg3)">esc</kbd>
+        </div>
+        <div style="max-height:340px;overflow-y:auto;padding:7px">
+          <sc-for list="{{ paletteGroups }}" as="g" hint-placeholder-count="2">
+            <div style="padding:7px 8px 2px">
+              <p style="margin:0;font-size:10.5px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--fg3)">{{ g.label }}</p>
+              <sc-for list="{{ g.items }}" as="it" hint-placeholder-count="3">
+                <button onClick="{{ it.run }}" style="display:flex;width:100%;align-items:center;gap:10px;padding:8px;margin-top:2px;border:0;border-radius:8px;background:transparent;cursor:pointer;text-align:start">
+                  <span style="flex:none;display:grid;place-items:center;width:24px;height:24px;border-radius:7px;background:{{ it.iconBg }};color:{{ it.iconFg }};font-family:'Geist Mono',ui-monospace,monospace;font-size:11px;font-weight:600">{{ it.glyph }}</span>
+                  <span style="flex:1;min-width:0;font-size:12.5px">{{ it.label }}</span>
+                  <span style="flex:none;font-family:'Geist Mono',ui-monospace,monospace;font-size:10.5px;color:var(--fg3)">{{ it.hint }}</span>
+                </button>
+              </sc-for>
+            </div>
+          </sc-for>
+          <sc-if value="{{ paletteEmpty }}" hint-placeholder-val="{{ false }}">
+            <p style="margin:0;padding:26px;text-align:center;font-size:12px;color:var(--fg3)">Aucun résultat pour « {{ query }} ».</p>
+          </sc-if>
+        </div>
+      </div>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{ toast }}" hint-placeholder-val="{{ false }}">
+    <div style="position:fixed;inset-inline-start:50%;bottom:22px;transform:translateX(-50%);z-index:60;display:flex;align-items:center;gap:9px;padding:10px 14px;border:1px solid var(--border2);border-radius:10px;background:var(--fg);color:var(--bg);font-size:12.5px;box-shadow:0 10px 30px rgba(2,6,23,.3)">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12l5 5L20 6"></path></svg>
+      <span>{{ toast }}</span>
+    </div>
+  </sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1440,&quot;height&quot;:900}}">
+const NAV = [
+  { id: "dash", label: "Tableau de bord", path: "M4 13h6V4H4zM14 20h6V4h-6zM4 20h6v-4H4z", title: "Tableau de bord", sub: "Atlas Négoce SARL · exercice 2026 · régime normal, TVA mensuelle" },
+  { id: "rec", label: "Rapprochement", path: "M4 8h13l-3-3M20 16H7l3 3", title: "Rapprochement bancaire (lettrage)", sub: "Relevé BMCE juillet 2026 · 42 lignes · 9 non lettrées" },
+  { id: "inbox", label: "Réception", path: "M4 13l2-7h12l2 7v5H4zM4 13h5l1 2h4l1-2h5", title: "Réception & vérification des pièces", sub: "1 document en attente de validation · 7 à revoir" },
+  { id: "invoices", label: "Facturation", path: "M6 3h9l3 3v15l-3-2-3 2-3-2-3 2zM9 9h6M9 13h6", title: "Facturation sortante", sub: "Série FA-2026 · numérotation séquentielle continue" },
+  { id: "tax", label: "TVA & états", path: "M6 3h12v18H6zM9 8h6M9 12h6M9 16h3", title: "TVA, IS et états de synthèse", sub: "Déclaration TVA 07/2026 · échéance 20/08" },
+  { id: "legacy", label: "Écrans actuels", path: "M4 5h16v11H4zM9 20h6M12 16v4", title: "Écrans actuels (D2)", sub: "Reproduction de l'existant — référence de comparaison" },
+  { id: "settings", label: "Paramètres", path: "M12 9a3 3 0 100 6 3 3 0 000-6M4.5 12l-1-2 1.6-2.8 2.2.3 1.7-1.5L9.5 4h5l.5 2 1.7 1.5 2.2-.3L20.5 10l-1 2 1 2-1.6 2.8-2.2-.3-1.7 1.5-.5 2h-5l-.5-2-1.7-1.5-2.2.3L3.5 14z", title: "Paramètres", sub: "Plan comptable, taux, utilisateurs, connecteurs" },
+];
+
+const REC_SEED = [
+  { id: 1, label: "Virement reçu — SOMAFER SARL", amount: 68400, sign: 1, bankMeta: "03/07/2026 · 5141 · VIR/2026/07/0114", piece: "FA-2026-0087 · SOMAFER SARL", pieceMeta: "3421 Clients · TTC 68 400,00 · échue 30/06", conf: 98, reason: "Montant et référence exacts, tiers déjà lettré 11 fois." },
+  { id: 2, label: "Prélèvement — ONEE Électricité", amount: -12318.4, sign: -1, bankMeta: "05/07/2026 · 5141 · PRLV/ONEE/072026", piece: "FACT-2026-0731-ONEE.pdf", pieceMeta: "61251 Achats · TTC 12 318,40 · TVA 14 %", conf: 94, reason: "Montant identique, échéance à 5 jours du prélèvement." },
+  { id: 3, label: "Chèque n° 4471029 — Rachid Transport", amount: -21600, sign: -1, bankMeta: "09/07/2026 · 5141 · CHQ/4471029", piece: "FA-FR-2026-0332 · Rachid Transport", pieceMeta: "61426 Transports · TTC 21 600,00 · RAS honoraires ?", conf: 76, reason: "Écart de 2 jours ; nature du paiement à confirmer pour la RAS." },
+  { id: 4, label: "Virement émis — DGI SIMPL TVA", amount: -34980, sign: -1, bankMeta: "20/07/2026 · 5141 · SIMPL/TVA/062026", piece: "Déclaration TVA 06/2026", pieceMeta: "4456 État TVA due · 34 980,00", conf: 91, reason: "Correspond au solde 4456 de la période 06 déclarée." },
+  { id: 5, label: "Frais bancaires trimestriels", amount: -742.5, sign: -1, bankMeta: "31/07/2026 · 5141 · COMM/T2", piece: "Aucune pièce — 6147 Services bancaires", pieceMeta: "Justificatif manquant · TVA 10 % présumée", conf: 0, reason: "Aucun document correspondant dans la réception." },
+];
+
+const FIELD_SEED = [
+  { name: "invoice_number", label: "Numéro de facture", value: "F-2026-07-118455", conf: 0.97, num: false },
+  { name: "invoice_date", label: "Date de facture", value: "31/07/2026", conf: 0.95, num: true },
+  { name: "due_date", label: "Date d'échéance", value: "10/08/2026", conf: 0.88, num: true },
+  { name: "supplier_name", label: "Nom du fournisseur", value: "ONEE — Branche Électricité", conf: 0.96, num: false },
+  { name: "supplier_ice", label: "ICE fournisseur", value: "001561234000078", conf: 0.64, num: true },
+  { name: "supplier_if", label: "IF fournisseur", value: "03310072", conf: 0.72, num: true },
+  { name: "currency", label: "Devise", value: "MAD", conf: 0.99, num: false },
+  { name: "total_ht", label: "Total HT", value: "10 806,49", conf: 0.93, num: true },
+  { name: "total_tva", label: "Total TVA", value: "1 511,91", conf: 0.9, num: true },
+  { name: "total_ttc", label: "Total TTC", value: "12 318,40", conf: 0.94, num: true },
+  { name: "tva_rate", label: "Taux TVA (ligne 1)", value: "14,00 %", conf: 0.86, num: true },
+  { name: "payment_terms", label: "Conditions de paiement", value: "Prélèvement à 10 jours", conf: 0.58, num: false },
+];
+
+const LOW = 0.7;
+
+class Component extends DCLogic {
+  state = {
+    theme: "light",
+    view: "dash",
+    sidebarOpen: true,
+    orgOpen: false,
+    copilotOpen: true,
+    paletteOpen: false,
+    query: "",
+    draft: "",
+    recFilter: "all",
+    rec: REC_SEED.map((r) => ({ ...r, status: "pending" })),
+    fields: FIELD_SEED.map((f) => ({ ...f, corrected: false })),
+    attention: [
+      { id: "dup", dot: "var(--neg)", title: "Abonnement dupliqué détecté", detail: "Deux prélèvements « Sage Cloud » de 1 190,00 MAD le 02/07 et le 04/07, même ICE fournisseur.", meta: "6147 · confiance 92 %", primaryLabel: "Examiner les deux pièces" },
+      { id: "uncat", dot: "var(--warn)", title: "9 lignes bancaires non lettrées", detail: "Relevé BMCE 07/2026 — dont 3 sans justificatif dans la réception.", meta: "5141 · import du 01/08 09:12", primaryLabel: "Ouvrir le rapprochement" },
+      { id: "ras", dot: "var(--warn)", title: "Nature de paiement indéterminée", detail: "Rachid Transport 21 600,00 MAD — retenue à la source applicable ou non ? Non déterminée avec certitude, donc signalée.", meta: "TODO(legal) · aucun défaut appliqué", primaryLabel: "Qualifier le paiement" },
+      { id: "cash", dot: "var(--neg)", title: "TVA non déductible probable", detail: "Facture Menuiserie Zaki réglée en espèces au-delà du seuil légal par transaction.", meta: "34552 · seuil daté 01/01/2026", primaryLabel: "Voir la règle appliquée" },
+    ],
+    messages: [
+      { id: "m0", kind: "text", text: "Bonjour. J'ai relu le relevé BMCE de juillet et les 12 pièces reçues. Trois points demandent une décision de votre part." },
+      {
+        id: "m1", kind: "card", title: "Justificatifs manquants — juillet 2026",
+        note: "3 lignes bancaires sans pièce. Aucune écriture proposée sans justificatif.",
+        rows: [
+          { a: "Frais bancaires trimestriels", b: "−742,50", neg: true },
+          { a: "Carburant Afriquia 14/07", b: "−1 280,00", neg: true },
+          { a: "Fournitures Marjane 22/07", b: "−2 104,60", neg: true },
+        ],
+        status: "pending", approveLabel: "Demander les 3 pièces",
+      },
+    ],
+    toast: null,
+  };
+
+  componentDidMount() {
+    document.documentElement.setAttribute("data-m7-theme", this.state.theme);
+    this._key = (e) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
+        e.preventDefault();
+        this.setState((s) => ({ paletteOpen: !s.paletteOpen, query: "" }));
+      } else if (e.key === "Escape") {
+        this.setState({ paletteOpen: false, orgOpen: false });
+      }
+    };
+    window.addEventListener("keydown", this._key);
+  }
+  componentWillUnmount() { window.removeEventListener("keydown", this._key); }
+
+  fmt(n) {
+    const s = Math.abs(n).toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    return (n < 0 ? "−" : "") + s;
+  }
+  flash(text) {
+    this.setState({ toast: text });
+    clearTimeout(this._t);
+    this._t = setTimeout(() => this.setState({ toast: null }), 2600);
+  }
+  go(view) { this.setState({ view, paletteOpen: false, orgOpen: false }); }
+  patchRec(id, status) {
+    this.setState((s) => ({ rec: s.rec.map((r) => (r.id === id ? { ...r, status } : r)) }));
+  }
+  pushCard(card) {
+    this.setState((s) => ({ messages: [...s.messages, card] }));
+  }
+  resolveMsg(id, status) {
+    this.setState((s) => ({ messages: s.messages.map((m) => (m.id === id ? { ...m, status } : m)) }));
+  }
+
+  runQuick(key) {
+    const id = "m" + Date.now();
+    const prompts = {
+      receipts: "Trouver les justificatifs manquants",
+      forecast: "Prévoir la trésorerie jusqu'au 30/09",
+      categorize: "Catégoriser les lignes non lettrées",
+      tva: "Contrôler la TVA du mois",
+    };
+    const cards = {
+      receipts: { title: "Justificatifs manquants — juillet 2026", note: "3 lignes bancaires sans pièce.", rows: [{ a: "Frais bancaires trimestriels", b: "−742,50", neg: true }, { a: "Carburant Afriquia 14/07", b: "−1 280,00", neg: true }, { a: "Fournitures Marjane 22/07", b: "−2 104,60", neg: true }], approveLabel: "Demander les 3 pièces" },
+      forecast: { title: "Prévision de trésorerie — T3 2026", note: "Encaissements à échéance, TVA 07 le 20/08, IS acompte le 30/09.", rows: [{ a: "Solde au 31/08", b: "512 000,00" }, { a: "Solde au 30/09", b: "463 500,00" }, { a: "Point bas prévu (28/09)", b: "441 200,00", neg: true }], approveLabel: "Épingler au tableau de bord" },
+      categorize: { title: "Catégorisation proposée — 4 lignes", note: "Comptes CGNC issus de vos écritures historiques. Rien n'est comptabilisé avant validation.", rows: [{ a: "ONEE Électricité → 61251", b: "94 %" }, { a: "DGI TVA → 4456", b: "91 %" }, { a: "SOMAFER → 3421", b: "98 %" }, { a: "Rachid Transport → 61426", b: "76 %" }], approveLabel: "Valider les 3 ≥ 90 %" },
+      tva: { title: "Contrôle TVA — période 07/2026", note: "Solde 4455/34552 rapproché des pièces de la période.", rows: [{ a: "TVA facturée (4455)", b: "52 806,00" }, { a: "TVA récupérable (34552)", b: "14 394,00" }, { a: "TVA due", b: "38 412,00" }, { a: "Pièces en attente affectant le solde", b: "2", neg: true }], approveLabel: "Préparer la déclaration SIMPL" },
+    };
+    const c = cards[key];
+    this.setState((s) => ({
+      copilotOpen: true,
+      messages: [...s.messages,
+        { id: id + "u", kind: "user", text: prompts[key] },
+        { id, kind: "card", status: "pending", action: key, ...c }],
+    }));
+  }
+
+  approveCard(m) {
+    if (m.action === "categorize") {
+      this.setState((s) => ({ rec: s.rec.map((r) => (r.conf >= 90 ? { ...r, status: "matched" } : r)) }));
+      this.resolveMsg(m.id, "approved");
+      this.flash("3 lettrages créés en brouillon — journal de banque");
+      this.go("rec");
+      return;
+    }
+    if (m.action === "receipts") {
+      this.resolveMsg(m.id, "approved");
+      this.flash("Relance envoyée pour 3 justificatifs");
+      return;
+    }
+    this.resolveMsg(m.id, "approved");
+    this.flash("Action enregistrée en brouillon");
+  }
+
+  send() {
+    const text = this.state.draft.trim();
+    if (!text) return;
+    const id = "m" + Date.now();
+    this.setState((s) => ({
+      draft: "",
+      messages: [...s.messages,
+        { id: id + "u", kind: "user", text },
+        { id, kind: "card", status: "pending", action: "generic", title: "Réponse — " + text.slice(0, 40),
+          note: "Recherche dans vos écritures 2025-2026 (locataire courant uniquement).",
+          rows: [{ a: "Écritures correspondantes", b: "7" }, { a: "Période couverte", b: "01/2026 → 07/2026" }, { a: "Pièces à revoir", b: "2", neg: true }],
+          approveLabel: "Ouvrir la sélection" }],
+    }));
+  }
+
+  renderVals() {
+    const s = this.state;
+    const nav = NAV.find((n) => n.id === s.view) || NAV[0];
+    const dark = s.theme === "dark";
+
+    const kpis = [
+      { label: "Trésorerie", value: this.fmt(486240), unit: "MAD", delta: "+11,0 %", deltaColor: "var(--pos)", color: "var(--fg)", sub: "5141 Banque + 5161 Caisse au 31/07", subColor: "var(--fg3)", alert: false },
+      { label: "Créances clients", value: this.fmt(213480), unit: "MAD", delta: "3421", deltaColor: "var(--fg3)", color: "var(--fg)", sub: "62 900,00 échues > 30 j (4 clients)", subColor: "var(--neg)", alert: true },
+      { label: "TVA due · 07/2026", value: this.fmt(38412), unit: "MAD", delta: "20/08", deltaColor: "var(--warn)", color: "var(--fg)", sub: "Régime débit · déclaration mensuelle", subColor: "var(--fg3)", alert: false },
+      { label: "IS estimé · 2026", value: this.fmt(104650), unit: "MAD", delta: "acompte 3", deltaColor: "var(--fg3)", color: "var(--fg)", sub: "Avant réintégrations — non validé", subColor: "var(--ai)", alert: false },
+    ];
+    const minis = [
+      { label: "Chiffre d'affaires cumulé", value: this.fmt(2148900) + " MAD", color: "var(--fg)" },
+      { label: "Burn net mensuel", value: "−" + this.fmt(41200).replace("−", "") + " MAD", color: "var(--neg)" },
+      { label: "Documents à revoir", value: "7", color: "var(--warn)" },
+      { label: "Série FA-2026", value: "continue · 0 rupture", color: "var(--pos)" },
+    ];
+
+    const filtered = s.rec.filter((r) =>
+      s.recFilter === "all" ? true : s.recFilter === "pending" ? r.status === "pending" : r.conf === 0);
+
+    const recRows = filtered.map((r) => {
+      const done = r.status === "matched";
+      const rejected = r.status === "rejected";
+      const tone = r.conf >= 90 ? "var(--pos)" : r.conf > 0 ? "var(--warn)" : "var(--fg3)";
+      return {
+        ...r,
+        amount: this.fmt(r.amount) + " MAD",
+        amountColor: r.sign > 0 ? "var(--pos)" : "var(--neg)",
+        rowBg: done ? "var(--posbg)" : rejected ? "var(--surface2)" : "transparent",
+        confLabel: r.conf === 0 ? "Non lettré" : (r.conf >= 90 ? "Élevée " : "Moyenne ") + r.conf + " %",
+        confFg: tone, confBorder: tone,
+        confBg: r.conf >= 90 ? "var(--posbg)" : r.conf > 0 ? "var(--warnbg)" : "transparent",
+        linkPath: done ? "M4 12l5 5L20 6" : r.conf === 0 ? "M6 6l12 12M18 6L6 18" : "M4 8h13l-3-3M20 16H7l3 3",
+        linkFg: done ? "#fff" : tone,
+        linkBg: done ? "var(--pos)" : "var(--surface)",
+        linkBorder: done ? "var(--pos)" : "var(--border2)",
+        done, pending: r.status === "pending" && r.conf > 0,
+        reason: rejected ? "Rejeté — repasse en saisie manuelle." : r.reason,
+        approve: () => { this.patchRec(r.id, "matched"); this.flash("Lettrage créé en brouillon"); },
+        reject: () => { this.patchRec(r.id, "rejected"); this.flash("Proposition rejetée — conservée dans l'audit"); },
+      };
+    });
+
+    const highCount = s.rec.filter((r) => r.conf >= 90 && r.status === "pending").length;
+
+    const fields = s.fields.map((f, i) => {
+      const low = f.conf < LOW;
+      const border = f.corrected ? "#3b82f6" : low ? "#f59e0b" : "var(--border)";
+      return {
+        label: f.label, value: f.value, ai: !f.corrected,
+        font: f.num ? "'Geist Mono',ui-monospace,monospace" : "Geist,sans-serif",
+        rowBg: low && !f.corrected ? "var(--warnbg)" : "transparent",
+        inputBorder: border,
+        confText: f.corrected ? "corrigé" : Math.round(f.conf * 100) + " % conf.",
+        confColor: f.corrected ? "#3b82f6" : low ? "var(--warn)" : "var(--fg3)",
+        tooltip: "Extrait par le modèle · confiance " + Math.round(f.conf * 100) + " % · page 1, zone encadrée. Valeur d'origine conservée.",
+        edit: (e) => {
+          const v = e.target.value;
+          this.setState((st) => ({ fields: st.fields.map((x, j) => (j === i ? { ...x, value: v, corrected: true } : x)) }));
+        },
+      };
+    });
+
+    const boxes = [
+      { left: "10%", top: "13%", width: "38%", height: "5%", color: "#10b981", label: "supplier_name" },
+      { left: "58%", top: "22%", width: "30%", height: "4.5%", color: "#f59e0b", label: "supplier_ice 64 %" },
+      { left: "56%", top: "63%", width: "32%", height: "4.5%", color: "#10b981", label: "total_ht" },
+      { left: "56%", top: "70%", width: "32%", height: "4.5%", color: "#10b981", label: "total_ttc" },
+      { left: "10%", top: "84%", width: "44%", height: "4.5%", color: "#f59e0b", label: "payment_terms 58 %" },
+    ];
+
+    const messages = s.messages.map((m) => ({
+      ...m,
+      isUser: m.kind === "user",
+      isText: m.kind === "text",
+      isCard: m.kind === "card",
+      align: m.kind === "user" ? "flex-end" : "stretch",
+      maxWidth: m.kind === "user" ? "85%" : "100%",
+      width: m.kind === "card" ? "100%" : "auto",
+      rows: (m.rows || []).map((r) => ({ ...r, color: r.neg ? "var(--neg)" : "var(--fg)" })),
+      pending: m.status === "pending",
+      resolved: m.status === "approved" || m.status === "rejected",
+      resolvedText: m.status === "approved" ? "✓ Validé — brouillon créé, en attente de validation du journal." : "Rejeté. Conservé dans le journal d'audit.",
+      resolvedColor: m.status === "approved" ? "var(--pos)" : "var(--fg3)",
+      approve: () => this.approveCard(m),
+      reject: () => { this.resolveMsg(m.id, "rejected"); this.flash("Proposition rejetée"); },
+      edit: () => this.flash("Ouverture de l'éditeur de proposition"),
+    }));
+
+    const cmds = [
+      { glyph: "⌥", label: "Lettrer les correspondances ≥ 90 %", hint: "rapprochement", run: () => { this.setState((st) => ({ rec: st.rec.map((r) => (r.conf >= 90 ? { ...r, status: "matched" } : r)), paletteOpen: false, view: "rec" })); this.flash("3 lettrages créés en brouillon"); } },
+      { glyph: "◇", label: "Trouver les justificatifs manquants", hint: "copilote", run: () => { this.setState({ paletteOpen: false }); this.runQuick("receipts"); } },
+      { glyph: "≡", label: "Préparer la déclaration TVA 07/2026", hint: "SIMPL", run: () => { this.setState({ paletteOpen: false }); this.runQuick("tva"); } },
+      { glyph: "↗", label: "Prévoir la trésorerie jusqu'au 30/09", hint: "copilote", run: () => { this.setState({ paletteOpen: false }); this.runQuick("forecast"); } },
+    ];
+    const jumps = NAV.map((n) => ({ glyph: "→", label: n.label, hint: "/" + n.id, run: () => this.go(n.id) }));
+    const recs = [
+      { glyph: "34", label: "34552 — État TVA récupérable", hint: "compte", run: () => this.go("tax") },
+      { glyph: "FA", label: "FA-2026-0087 — SOMAFER SARL · 68 400,00", hint: "facture", run: () => this.go("invoices") },
+      { glyph: "ON", label: "ONEE — Branche Électricité", hint: "tiers", run: () => this.go("inbox") },
+    ];
+    const q = s.query.trim().toLowerCase();
+    const match = (arr) => (q ? arr.filter((i) => i.label.toLowerCase().includes(q)) : arr);
+    const groups = [
+      { label: "Commandes IA", items: match(cmds) },
+      { label: "Comptes, tiers, pièces", items: match(recs) },
+      { label: "Aller à", items: match(jumps) },
+    ].filter((g) => g.items.length > 0).map((g) => ({
+      ...g,
+      items: g.items.map((i) => ({ ...i, iconBg: g.label === "Commandes IA" ? "var(--aibg)" : "var(--surface2)", iconFg: g.label === "Commandes IA" ? "var(--ai)" : "var(--fg2)" })),
+    }));
+
+    return {
+      sidebarOpen: s.sidebarOpen,
+      sidebarWidth: s.sidebarOpen ? "234px" : "64px",
+      orgOpen: s.orgOpen,
+      toggleOrg: () => this.setState((st) => ({ orgOpen: !st.orgOpen })),
+      orgs: [
+        { name: "Atlas Négoce SARL", regime: "normal", pick: () => this.setState({ orgOpen: false }) },
+        { name: "Zaki Menuiserie — auto-ent.", regime: "simplifié", pick: () => { this.setState({ orgOpen: false }); this.flash("Locataire changé — données rechargées"); } },
+        { name: "Cabinet Bennani (accès fiduciaire)", regime: "lecture", pick: () => { this.setState({ orgOpen: false }); this.flash("Accès fiduciaire — portée limitée, expire le 31/12"); } },
+      ],
+      nav: NAV.map((n) => ({
+        label: n.label, icon: n.id, path: n.path,
+        bg: s.view === n.id ? "var(--surface2)" : "transparent",
+        fg: s.view === n.id ? "var(--fg)" : "var(--fg2)",
+        weight: s.view === n.id ? "600" : "400",
+        showBadge: (n.id === "inbox" || n.id === "rec") && s.sidebarOpen,
+        badge: n.id === "inbox" ? "7" : String(s.rec.filter((r) => r.status === "pending").length),
+        go: () => this.go(n.id),
+      })),
+      themeLabel: dark ? "Thème clair" : "Thème sombre",
+      toggleTheme: () => {
+        const next = dark ? "light" : "dark";
+        document.documentElement.setAttribute("data-m7-theme", next);
+        this.setState({ theme: next });
+      },
+      toggleSidebar: () => this.setState((st) => ({ sidebarOpen: !st.sidebarOpen })),
+
+      viewTitle: nav.title, viewSub: nav.sub,
+      isDash: s.view === "dash", isRec: s.view === "rec", isInbox: s.view === "inbox",
+      isLegacy: s.view === "legacy",
+      isStub: s.view === "invoices" || s.view === "tax" || s.view === "settings",
+
+      kpis, minis,
+      attention: s.attention.map((a) => ({
+        ...a,
+        primary: () => { if (a.id === "uncat") this.go("rec"); else this.go("inbox"); },
+        dismiss: () => this.setState((st) => ({ attention: st.attention.filter((x) => x.id !== a.id) })),
+      })),
+      attentionCount: s.attention.length,
+      attentionEmpty: s.attention.length === 0,
+
+      recRows, highCount,
+      recFilters: [
+        { key: "all", label: "Toutes (5)" },
+        { key: "pending", label: "À traiter" },
+        { key: "none", label: "Sans pièce" },
+      ].map((f) => ({
+        label: f.label,
+        bg: s.recFilter === f.key ? "var(--fg)" : "transparent",
+        fg: s.recFilter === f.key ? "var(--bg)" : "var(--fg2)",
+        border: s.recFilter === f.key ? "var(--fg)" : "var(--border)",
+        pick: () => this.setState({ recFilter: f.key }),
+      })),
+      approveAllHigh: () => {
+        this.setState((st) => ({ rec: st.rec.map((r) => (r.conf >= 90 && r.status === "pending" ? { ...r, status: "matched" } : r)) }));
+        this.flash(highCount + " lettrages créés en brouillon");
+      },
+
+      fields, boxes,
+      arithmeticWarn: false,
+      queueStats: [
+        { label: "En file d'extraction", value: "2", color: "var(--fg)" },
+        { label: "Faible confiance", value: "7", color: "var(--warn)" },
+        { label: "Doublons écartés", value: "1", color: "var(--fg2)" },
+      ],
+      postingLines: [
+        { account: "61251", label: "Achats d'électricité", debit: "10 806,49", credit: "" },
+        { account: "34552", label: "État TVA récupérable 14 %", debit: "1 511,91", credit: "" },
+        { account: "4411", label: "Fournisseur ONEE", debit: "", credit: "12 318,40" },
+      ],
+      postLabel: "Comptabiliser en brouillon (journal ACH)",
+      postDraft: () => this.flash("Écriture créée en brouillon — équilibrée 12 318,40 / 12 318,40"),
+      flagField: () => this.flash("Document signalé — file de révision humaine"),
+      simulateUpload: () => this.flash("2 fichiers acceptés · analyse antivirus en cours"),
+
+      copilotOpen: s.copilotOpen,
+      toggleCopilot: () => this.setState((st) => ({ copilotOpen: !st.copilotOpen })),
+      messages,
+      quickActions: [
+        { label: "Justificatifs manquants", run: () => this.runQuick("receipts") },
+        { label: "Prévision T3", run: () => this.runQuick("forecast") },
+        { label: "Catégoriser le non lettré", run: () => this.runQuick("categorize") },
+        { label: "Contrôle TVA", run: () => this.runQuick("tva") },
+      ],
+      draft: s.draft,
+      setDraft: (e) => this.setState({ draft: e.target.value }),
+      draftKey: (e) => { if (e.key === "Enter") this.send(); },
+      send: () => this.send(),
+
+      paletteOpen: s.paletteOpen,
+      openPalette: () => this.setState({ paletteOpen: true, query: "" }),
+      closePalette: () => this.setState({ paletteOpen: false }),
+      stop: (e) => e.stopPropagation(),
+      query: s.query,
+      setQuery: (e) => this.setState({ query: e.target.value }),
+      paletteGroups: groups,
+      paletteEmpty: groups.length === 0,
+
+      legacyDocs: [
+        { name: "IMG_20260731_ONEE.jpg", status: "Extrait", date: "31 juil. 2026 à 18:04" },
+        { name: "facture-somafer-0087.pdf", status: "En cours", date: "31 juil. 2026 à 09:41" },
+        { name: "recu-marjane.heic", status: "Échec", date: "22 juil. 2026 à 12:17" },
+      ],
+      legacyFields: [
+        { label: "Numéro de facture", value: "F-2026-07-118455", low: false },
+        { label: "Date de facture", value: "31/07/2026", low: false },
+        { label: "ICE fournisseur", value: "001561234000078", low: true },
+        { label: "Total TTC", value: "12318.40", low: false },
+      ],
+      toast: s.toast,
+    };
+  }
+}
+</script>
+</body>
+</html>

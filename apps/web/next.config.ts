@@ -10,9 +10,10 @@ loadEnv({
 });
 
 const nextConfig: NextConfig = {
-  // @mou7asib/db ships TypeScript source (Prisma 7 generates .ts), so Next
-  // must compile it rather than expect prebuilt JS.
-  transpilePackages: ["@mou7asib/db"],
+  // @mou7asib/db, @mou7asib/ui and @mou7asib/accounting ship TypeScript/TSX source
+  // directly (Prisma 7 generates .ts; the other two have no build step of their own), so
+  // Next must compile them rather than expect prebuilt JS.
+  transpilePackages: ["@mou7asib/db", "@mou7asib/ui", "@mou7asib/accounting"],
   typedRoutes: true,
   experimental: { useTypeScriptCli: true },
 };

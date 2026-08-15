@@ -23,6 +23,10 @@ services:
       # /var/lib/postgresql/data — the older path leaves the data directory
       # unused and the server refuses to start.
       - mou7asib-pgdata:/var/lib/postgresql
+      # Only runs on a brand-new (empty) volume — see db-init/01-app-role.sql for why
+      # this exists (RLS needs a non-superuser runtime role) and how to apply it to an
+      # already-initialized volume by hand.
+      - ./db-init:/docker-entrypoint-initdb.d:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U mou7asib -d mou7asib"]
       interval: 5s

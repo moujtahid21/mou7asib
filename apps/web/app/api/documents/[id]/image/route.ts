@@ -1,7 +1,8 @@
 import { readFile } from "node:fs/promises";
 import { NextResponse } from "next/server";
-import { prisma } from "@mou7asib/db";
+import { withTenant } from "@mou7asib/db";
 import { resolveUploadPath, visibleDocumentWhere } from "@/lib/documents";
+import { requireSession } from "@/lib/auth";
 
 // CLAUDE.md §8.4 — the demo-scoped substitute for a pre-signed URL: a
 // per-request authorization check (tenantId + not-deleted) instead of a
@@ -14,12 +15,15 @@ export async function GET(
   _request: Request,
   { params }: { params: Promise<{ id: string }> },
 ): Promise<Response> {
+  const session = await requireSession();
   const { id } = await params;
 
-  const document = await prisma.document.findFirst({
-    where: { id, ...visibleDocumentWhere() },
-    select: { storagePath: true, mimeType: true },
-  });
+  const document = await withTenant(session.tenantId, (tx) =>
+    tx.document.findFirst({
+      where: { id, ...visibleDocumentWhere(session.tenantId) },
+      select: { storagePath: true, mimeType: true },
+    }),
+  );
 
   if (!document) {
     return NextResponse.json({ error: "Document introuvable." }, { status: 404 });

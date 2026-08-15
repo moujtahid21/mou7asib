@@ -6,8 +6,9 @@ import path from "node:path";
 import { redirect } from "next/navigation";
 import { fileTypeFromBuffer } from "file-type";
 import sharp from "sharp";
-import { prisma } from "@mou7asib/db";
-import { DEMO_TENANT_ID } from "@/lib/tenant";
+import { withTenant } from "@mou7asib/db";
+import { requireSession } from "@/lib/auth";
+import { can } from "@/lib/policy";
 import { scanBufferForMalware } from "@/lib/malwareScanner";
 
 // Photos (camera capture) and PDFs (how Moroccan businesses commonly
@@ -54,6 +55,11 @@ export async function uploadDocument(
   _prevState: UploadState,
   formData: FormData,
 ): Promise<UploadState> {
+  const session = await requireSession();
+  if (!can(session.role, "document:write")) {
+    return { error: "Action non autorisée pour ce rôle." };
+  }
+
   const file = formData.get("photo");
   if (!(file instanceof File) || file.size === 0) {
     return { error: "Aucun fichier reçu." };
@@ -88,10 +94,12 @@ export async function uploadDocument(
 
   // Duplicate detection (CLAUDE.md §7.2) — a re-upload of the same content
   // costs nothing and lands on the same document rather than a new row.
-  const existing = await prisma.document.findUnique({
-    where: { tenantId_contentHash: { tenantId: DEMO_TENANT_ID, contentHash } },
-    select: { id: true },
-  });
+  const existing = await withTenant(session.tenantId, (tx) =>
+    tx.document.findUnique({
+      where: { tenantId_contentHash: { tenantId: session.tenantId, contentHash } },
+      select: { id: true },
+    }),
+  );
 
   let documentId: string;
   if (existing) {
@@ -107,17 +115,17 @@ export async function uploadDocument(
     const relativeStoragePath = path.join(
       "uploads",
       "documents",
-      DEMO_TENANT_ID,
+      session.tenantId,
       `${contentHash}.${extension}`,
     );
     const absoluteStoragePath = path.join(repoRoot, relativeStoragePath);
     await mkdir(path.dirname(absoluteStoragePath), { recursive: true });
     await writeFile(absoluteStoragePath, normalizedBytes);
 
-    const document = await prisma.$transaction(async (tx) => {
+    const document = await withTenant(session.tenantId, async (tx) => {
       const doc = await tx.document.create({
         data: {
-          tenantId: DEMO_TENANT_ID,
+          tenantId: session.tenantId,
           contentHash,
           originalFilename: file.name.length > 0 ? file.name : `document.${extension}`,
           mimeType: detected.mime,
@@ -130,7 +138,7 @@ export async function uploadDocument(
       });
       await tx.extractionJob.create({
         data: {
-          tenantId: DEMO_TENANT_ID,
+          tenantId: session.tenantId,
           documentId: doc.id,
           status: "queued",
         },

@@ -1,11 +1,18 @@
 # ADR 0006 — Scope for the first six months
 
-- **Status:** Proposed — awaiting decision by the project owner
+- **Status:** Superseded by [ADR 0007](0007-full-scope-rebuild.md) — 2026-08-14
 - **Date:** 2026-07-27
 - **Created by:** decision log D-06 (runway under six months), D-03 (team of two),
   D-07 (price point is a placeholder), D-08 (corpus limited to the founders' own documents)
 - **Supersedes:** the slice sequencing in `docs/build-order.md` for slices S7 onward
 - **Does not supersede:** ADR 0001. See "Why this is not an argument for Odoo" below.
+
+> **2026-08-14 — superseded.** The project owner decided to build the full
+> design-mockup scope for real rather than stay on the extraction-wedge path.
+> ADR 0007 records that decision and how the legal-data gap this ADR raised is
+> handled (effective-dated placeholders, not a blocker). Kept here for the
+> reasoning trail — the wedge-vs-full-scope tradeoff analysis below is still
+> accurate context, just no longer the chosen path.
 
 ---
 

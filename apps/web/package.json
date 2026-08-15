@@ -7,16 +7,22 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
   },
   "dependencies": {
+    "@mou7asib/accounting": "*",
     "@mou7asib/contracts": "*",
     "@mou7asib/db": "*",
+    "@mou7asib/ui": "*",
+    "argon2": "0.45.1",
     "clamscan": "2.4.0",
     "file-type": "22.0.1",
     "next": "16.2.12",
+    "otpauth": "9.5.1",
     "react": "19.2.8",
     "react-dom": "19.2.8",
+    "server-only": "0.0.1",
     "sharp": "0.35.3",
     "zod": "4.4.3"
   },
@@ -28,6 +34,7 @@
     "@types/react-dom": "19.2.3",
     "dotenv": "17.4.2",
     "tailwindcss": "4.3.3",
-    "typescript": "7.0.2"
+    "typescript": "7.0.2",
+    "vitest": "4.1.10"
   }
 }

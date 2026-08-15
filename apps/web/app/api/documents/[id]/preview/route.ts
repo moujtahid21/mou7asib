@@ -1,7 +1,8 @@
 import { readFile } from "node:fs/promises";
 import { NextResponse } from "next/server";
-import { prisma } from "@mou7asib/db";
+import { withTenant } from "@mou7asib/db";
 import { resolveUploadPath, visibleDocumentWhere } from "@/lib/documents";
+import { requireSession } from "@/lib/auth";
 
 // A raw PDF can't render inside an <img> tag — this serves a
 // browser-displayable preview: for an image upload, storagePath itself IS
@@ -13,12 +14,15 @@ export async function GET(
   _request: Request,
   { params }: { params: Promise<{ id: string }> },
 ): Promise<Response> {
+  const session = await requireSession();
   const { id } = await params;
 
-  const document = await prisma.document.findFirst({
-    where: { id, ...visibleDocumentWhere() },
-    select: { storagePath: true, previewImagePath: true, mimeType: true },
-  });
+  const document = await withTenant(session.tenantId, (tx) =>
+    tx.document.findFirst({
+      where: { id, ...visibleDocumentWhere(session.tenantId) },
+      select: { storagePath: true, previewImagePath: true, mimeType: true },
+    }),
+  );
 
   if (!document) {
     return NextResponse.json({ error: "Document introuvable." }, { status: 404 });

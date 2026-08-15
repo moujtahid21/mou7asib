@@ -1,10 +1,14 @@
 # ADR 0003 — Bank connectivity and statement ingestion
 
-- **Status:** Proposed — awaiting decision by the project owner
+- **Status:** Accepted (2026-08-15) — Option A implemented in phase 7 (build-order.md
+  S13), CSV only; MT940/CAMT.053 still need real bank sample files as test fixtures and
+  are deferred, not dropped.
 - **Date:** 2026-07-27
 - **Resolves:** CLAUDE.md §16 decision 3
 - **Scope:** how bank transactions enter the system. Not the *lettrage* matching algorithm,
-  which is a separate design.
+  which is a separate design — see phase 7's build-order.md entry for the matching
+  algorithm actually shipped (exact-amount + closest-date, over the tenant's own posted
+  ledger lines only).
 
 ---
 

@@ -36,12 +36,215 @@ model Tenant {
   name      String
   createdAt DateTime @default(now()) @db.Timestamptz(6)
 
+  /// CLAUDE.md §5.3 — must never be assumed (in particular, never default to débit).
+  /// Null until the owner explicitly picks one (see actions/setTvaRegime.ts); TVA posting
+  /// features prompt for a choice rather than silently proceeding while this is null.
+  tvaRegime TvaRegime? @map("tva_regime")
+
+  /// CLAUDE.md §5.3 — filing frequency depends on turnover thresholds CLAUDE.md itself
+  /// doesn't state and docs/legal-inputs.md L-17 hasn't resolved, so this is never
+  /// auto-derived; the owner picks explicitly (see actions/setTvaFilingFrequency.ts) and
+  /// can change it, same non-default posture as tvaRegime.
+  tvaFilingFrequency TvaFilingFrequency? @map("tva_filing_frequency")
+
+  /// Issuer identity for outgoing invoices (CLAUDE.md §5.6's mandatory mentions) — free
+  /// text, no format validation, because the exact ICE/IF check-digit algorithms (L-65,
+  /// L-66) are still TODO(legal). Null until the owner fills them in (see
+  /// actions/setTenantIdentity.ts); the mentions validator treats a null field the same
+  /// as an empty one — missing, blocks finalisation.
+  ice      String?
+  ifNumber String? @map("if_number")
+  rc       String?
+  patente  String?
+  cnss     String?
+
   documents          Document[]
   extractionJobs     ExtractionJob[]
   extractionAttempts ExtractionAttempt[]
   extractedFields    ExtractedField[]
+  memberships        TenantMembership[]
+  sessions           Session[]
+  auditLogs          AuditLog[]
+  accounts               Account[]
+  periods                Period[]
+  journalEntries         JournalEntry[]
+  journalLines           JournalLine[]
+  journalImports         JournalImport[]
+  bankStatementImports   BankStatementImport[]
+  bankTransactions       BankTransaction[]
+  invoices               Invoice[]
+  invoiceLines           InvoiceLine[]
+  invoiceSeriesCounters  InvoiceSeriesCounter[]
+  tvaDeclarationExports  TvaDeclarationExport[]
+  rasWithholdings        RasWithholding[]
+  isPassageWorksheets    IsPassageWorksheet[]
+  isPassageLines         IsPassageLine[]
+  accountantAccesses     AccountantAccess[]
 
   @@map("tenants")
+}
+
+// ── Phase 1 (ADR 0007): tenancy, identity, auth ──────────────────────────
+//
+// CLAUDE.md §8.1/§8.2: every tenant-owned table gets tenantId + RLS: the five
+// roles are enforced by policy.ts (apps/web/lib/policy.ts), not scattered
+// `if (role === 'owner')` checks. Sessions are server-revocable (Session row,
+// not a self-contained signed token) — httpOnly cookie carries only an opaque
+// token whose SHA-256 hash is looked up here, so a leaked cookie can't be
+// re-derived into a valid session and a revoked session takes effect
+// immediately everywhere, not just on next JWT expiry.
+
+enum Role {
+  owner
+  accountant_internal
+  accountant_external
+  employee
+  readonly
+
+  @@map("role")
+}
+
+model User {
+  id           String  @id @default(uuid(7)) @db.Uuid
+  /// Lowercased before every write and lookup (apps/web/lib/auth) — plain unique
+  /// String rather than the citext extension, one less thing to enable per environment.
+  email        String  @unique
+  /// argon2id encoded hash (includes salt + params) — never a raw/plain password anywhere.
+  passwordHash String  @map("password_hash")
+  /// Base32 TOTP secret. Mandatory before an owner/accountant_* membership can be used
+  /// (CLAUDE.md §8.2) — enforced in the login flow, not just a UI nudge.
+  totpSecret   String? @map("totp_secret")
+  totpEnabled  Boolean @default(false) @map("totp_enabled")
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  memberships          TenantMembership[]
+  sessions             Session[]
+  auditLogs            AuditLog[]
+  journalImports       JournalImport[]
+  bankStatementImports BankStatementImport[]
+  invoices             Invoice[]
+  tvaDeclarationExports TvaDeclarationExport[]
+  rasWithholdings      RasWithholding[]
+  isPassageWorksheetsCreated   IsPassageWorksheet[] @relation("IsWorksheetCreatedBy")
+  isPassageWorksheetsValidated IsPassageWorksheet[] @relation("IsWorksheetValidatedBy")
+  accountantAccessesGranted    AccountantAccess[]   @relation("AccountantAccessGrantee")
+  accountantAccessesCreated    AccountantAccess[]   @relation("AccountantAccessGrantedBy")
+  accountantAccessesRevoked    AccountantAccess[]   @relation("AccountantAccessRevokedBy")
+
+  @@map("users")
+}
+
+/// A user's role is per-tenant, not global — the same person can be `owner` of their own
+/// business and `accountant_external` on a client's, which is exactly the shape CLAUDE.md
+/// §8.1's AccountantAccess grant needs (phase 15 adds the scoped/expiring variant on top of
+/// this for non-owner accountant relationships; this table is the membership itself).
+model TenantMembership {
+  id       String @id @default(uuid(7)) @db.Uuid
+  tenantId String @map("tenant_id") @db.Uuid
+  tenant   Tenant @relation(fields: [tenantId], references: [id])
+  userId   String @map("user_id") @db.Uuid
+  user     User   @relation(fields: [userId], references: [id])
+  role     Role
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@unique([tenantId, userId])
+  @@index([tenantId])
+  @@index([userId])
+  @@map("tenant_memberships")
+}
+
+enum AccountantAccessScope {
+  read_only
+  read_write
+
+  @@map("accountant_access_scope")
+}
+
+/// CLAUDE.md §8.1 — "cross-tenant access exists only for accountants explicitly granted
+/// access by the tenant, through an explicit, audited AccountantAccess grant with a scope
+/// and an expiry." Distinct from TenantMembership on purpose: a membership is permanent
+/// and internal (an employee, or the owner's own accountant hired as staff); a grant here
+/// is how an *external* accountant (their own separate mou7asib tenant, not this one)
+/// reaches into a client's books — scoped, time-boxed, and revocable without deleting an
+/// account. Deliberately NOT RLS'd, same reasoning as TenantMembership/Session above: an
+/// accountant resolving "which tenants can I reach" cannot do that from inside any single
+/// tenant's RLS context, so this is bootstrap/identity data. apps/web/lib/accountantAccess.ts
+/// (resolveGrantedRole) is the single place that turns a row here into an effective Role.
+model AccountantAccess {
+  id           String                @id @default(uuid(7)) @db.Uuid
+  tenantId     String                @map("tenant_id") @db.Uuid
+  tenant       Tenant                @relation(fields: [tenantId], references: [id])
+  accountantId String                @map("accountant_id") @db.Uuid
+  accountant   User                  @relation("AccountantAccessGrantee", fields: [accountantId], references: [id])
+  scope        AccountantAccessScope
+
+  grantedById String    @map("granted_by_id") @db.Uuid
+  grantedBy   User      @relation("AccountantAccessGrantedBy", fields: [grantedById], references: [id])
+  expiresAt   DateTime  @map("expires_at") @db.Timestamptz(6)
+
+  revokedAt   DateTime? @map("revoked_at") @db.Timestamptz(6)
+  revokedById String?   @map("revoked_by_id") @db.Uuid
+  revokedBy   User?     @relation("AccountantAccessRevokedBy", fields: [revokedById], references: [id])
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  // One row per (tenant, accountant) pair — re-granting after expiry/revocation updates
+  // this same row (see actions/grantAccountantAccess.ts) rather than accumulating dead
+  // grants; the audit log, not this table, is the history.
+  @@unique([tenantId, accountantId])
+  @@index([tenantId])
+  @@index([accountantId])
+  @@map("accountant_accesses")
+}
+
+model Session {
+  id     String @id @default(uuid(7)) @db.Uuid
+  userId String @map("user_id") @db.Uuid
+  user   User   @relation(fields: [userId], references: [id])
+
+  /// The membership this session is scoped to right now — switching org (packages/ui's
+  /// org switcher) creates a new session for the target tenant rather than mutating this
+  /// one, so a stolen/replayed old session token can't ride along into the new tenant.
+  tenantId String @map("tenant_id") @db.Uuid
+  tenant   Tenant @relation(fields: [tenantId], references: [id])
+
+  /// SHA-256 of the opaque cookie token — the raw token is never persisted, mirroring the
+  /// password's own "never store the reversible form" rule.
+  tokenHash String    @unique @map("token_hash")
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  expiresAt DateTime  @map("expires_at") @db.Timestamptz(6)
+  revokedAt DateTime? @map("revoked_at") @db.Timestamptz(6)
+
+  @@index([userId])
+  @@index([tenantId])
+  @@map("sessions")
+}
+
+/// Append-only by convention (no update/delete call site exists) — CLAUDE.md §13's audit
+/// log requirement. before/after are the changed record's field values, not a full diff;
+/// left untyped (Json) since the shape varies by action, same tradeoff ExtractedField.boundingBox
+/// already makes for a field that's read out whole rather than filtered on.
+model AuditLog {
+  id       String  @id @default(uuid(7)) @db.Uuid
+  tenantId String  @map("tenant_id") @db.Uuid
+  tenant   Tenant  @relation(fields: [tenantId], references: [id])
+  userId   String? @map("user_id") @db.Uuid
+  user     User?   @relation(fields: [userId], references: [id])
+
+  action     String
+  targetType String? @map("target_type")
+  targetId   String? @map("target_id")
+  before     Json?
+  after      Json?
+  ip         String?
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@index([tenantId])
+  @@index([userId])
+  @@map("audit_logs")
 }
 
 enum DocumentStatus {
@@ -91,6 +294,8 @@ model Document {
   jobs     ExtractionJob[]
   attempts ExtractionAttempt[] @relation("DocumentAttempts")
   fields   ExtractedField[]
+  /// At most one — see JournalEntry.sourceDocumentId's comment.
+  postedJournalEntry JournalEntry?
 
   uploadedAt DateTime  @default(now()) @map("uploaded_at") @db.Timestamptz(6)
   updatedAt  DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
@@ -267,4 +472,660 @@ model ExtractedField {
   @@index([documentId])
   @@index([attemptId])
   @@map("extracted_fields")
+}
+
+// ── Phase 2 (ADR 0007): the ledger ────────────────────────────────────────
+//
+// CLAUDE.md §2 rules 1-4, §5.1, §9. This is the part of the app that must be provably
+// correct: balance, append-only, period lock are enforced at the database level (a raw
+// SQL migration alongside this schema — Prisma has no first-class trigger/constraint
+// syntax) precisely because CLAUDE.md §2 says application-level enforcement alone is not
+// enough. packages/accounting is the pure engine that builds valid inputs for these
+// tables; it never talks to Prisma itself.
+
+/// The shared CGNC reference plan (CLAUDE.md §5.1) — global, not tenant-owned, never
+/// mutated per tenant. Seeded as a structural skeleton (classes 0-9) plus a small,
+/// uncontroversial common-account subset; NOT the full official chart, which needs an
+/// authoritative source (L-61, still TODO(legal)) — see packages/db/src/seed.ts.
+model ReferenceAccount {
+  code       String  @id
+  label      String
+  labelAr    String  @map("label_ar")
+  /// 0-9, not 1-8 (CLAUDE.md §5.1 — classes 0 and 9 are hors bilan / analytique, real
+  /// CGNC classes, not an oversight).
+  classDigit Int     @map("class_digit")
+  parentCode String? @map("parent_code")
+
+  parent   ReferenceAccount?  @relation("ReferenceAccountHierarchy", fields: [parentCode], references: [code])
+  children ReferenceAccount[] @relation("ReferenceAccountHierarchy")
+
+  @@map("reference_accounts")
+}
+
+// ── Phase 8 (ADR 0007, build-order.md S7): TVA engine ────────────────────────
+//
+// Global reference data, same status as ReferenceAccount — TVA rates and the
+// cash-payment threshold are set by Moroccan law, identical for every tenant, not
+// per-tenant configuration. Every row is seeded `isPlaceholder: true` pending
+// docs/legal-inputs.md L-01 (rates) / L-13 (threshold) — CLAUDE.md §14: build the real
+// engine, seed it with clearly-marked placeholder data, never present placeholder output
+// as authoritative.
+
+enum TvaRegime {
+  encaissement
+  debit
+
+  @@map("tva_regime")
+}
+
+/// Effective-dated — CLAUDE.md §5.3: "rate selection is always resolved by (rateCode,
+/// transactionDate)". Multiple rows may share a rateCode across non-overlapping date
+/// ranges (a rate change); packages/accounting's resolveTvaRate() does the resolution.
+model TvaRate {
+  id            String    @id @default(uuid(7)) @db.Uuid
+  rateCode      String    @map("rate_code")
+  label         String
+  /// Fraction (0.2000 = 20%), not a percentage — matches applyRate()'s convention
+  /// (CLAUDE.md §6).
+  rate          Decimal   @db.Decimal(6, 4)
+  effectiveFrom DateTime  @map("effective_from") @db.Date
+  effectiveTo   DateTime? @map("effective_to") @db.Date
+  isPlaceholder Boolean   @default(true) @map("is_placeholder")
+  /// Explains what's *not* verified about this row — required whenever isPlaceholder is
+  /// true, shown wherever this rate feeds a screen (CLAUDE.md §14: don't just mark it,
+  /// surface it).
+  legalSourceNote String? @map("legal_source_note")
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@unique([rateCode, effectiveFrom])
+  @@map("tva_rates")
+}
+
+/// CLAUDE.md §5.3 — TVA on cash-settled invoices above this threshold is not deductible.
+/// Effective-dated for the same reason as TvaRate. A hit is a warning shown to the user,
+/// never an automatic block (packages/accounting's resolveCashThreshold() is deliberately
+/// just a lookup, not an enforcement decision) — the exact enforcement mechanics are
+/// L-13, still TODO(legal).
+model TvaCashThreshold {
+  id              String    @id @default(uuid(7)) @db.Uuid
+  thresholdAmount Decimal   @map("threshold_amount") @db.Decimal(19, 4)
+  effectiveFrom   DateTime  @map("effective_from") @db.Date
+  effectiveTo     DateTime? @map("effective_to") @db.Date
+  isPlaceholder   Boolean   @default(true) @map("is_placeholder")
+  legalSourceNote String?   @map("legal_source_note")
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@map("tva_cash_thresholds")
+}
+
+/// The tenant's own customisable sub-account layer (CLAUDE.md §5.1), seeded by copying
+/// ReferenceAccount rows at signup (apps/web/app/actions/signup.ts) — copies, not a
+/// foreign key into the shared table, so a tenant can rename/extend freely without ever
+/// touching shared reference data.
+model Account {
+  id                  String  @id @default(uuid(7)) @db.Uuid
+  tenantId            String  @map("tenant_id") @db.Uuid
+  tenant              Tenant  @relation(fields: [tenantId], references: [id])
+  code                String
+  label               String
+  classDigit          Int     @map("class_digit")
+  parentCode          String? @map("parent_code")
+  /// The ReferenceAccount.code this was seeded from, if any — traceability only, not a
+  /// live FK (see model doc). Null for an account the tenant added themselves.
+  sourceReferenceCode String? @map("source_reference_code")
+
+  journalLines JournalLine[]
+
+  @@unique([tenantId, code])
+  @@index([tenantId])
+  @@map("accounts")
+}
+
+enum PeriodStatus {
+  open
+  locked
+
+  @@map("period_status")
+}
+
+/// CLAUDE.md §2 rule 4 — once locked, nothing may post into it. Auto-vivified as
+/// calendar months the first time an entry posts into one (see postEntry.ts) rather
+/// than requiring an explicit fiscal-calendar setup step first; a real
+/// open/close workflow (fiscal year config, non-monthly periods) is a Paramètres
+/// concern for a later phase, not invented here.
+model Period {
+  id        String       @id @default(uuid(7)) @db.Uuid
+  tenantId  String       @map("tenant_id") @db.Uuid
+  tenant    Tenant       @relation(fields: [tenantId], references: [id])
+  startDate DateTime     @map("start_date") @db.Date
+  endDate   DateTime     @map("end_date") @db.Date
+  status    PeriodStatus @default(open)
+
+  journalEntries JournalEntry[]
+
+  @@unique([tenantId, startDate, endDate])
+  @@index([tenantId])
+  @@map("periods")
+}
+
+enum JournalEntryStatus {
+  draft
+  posted
+
+  @@map("journal_entry_status")
+}
+
+/// Draft entries are freely editable; posted entries are append-only (CLAUDE.md §2 rule
+/// 3), enforced by a trigger, not just by the UI not offering an edit button. Corrections
+/// go through a reversing entry that references the original via reversesEntryId.
+model JournalEntry {
+  id       String @id @default(uuid(7)) @db.Uuid
+  tenantId String @map("tenant_id") @db.Uuid
+  tenant   Tenant @relation(fields: [tenantId], references: [id])
+
+  /// Accounting date (CLAUDE.md §5.7 — distinct from any document/reception date, which
+  /// don't apply to a manual entry with no source document).
+  date        DateTime           @db.Date
+  /// CGNC-style journal category (ACH/VTE/BQ/CAI/OD/AN, ...) — a bookkeeping convention,
+  /// not a legally-sourced value, so a plain string rather than a TODO(legal) enum.
+  journalCode String             @map("journal_code")
+  label       String
+  status      JournalEntryStatus @default(draft)
+
+  periodId String? @map("period_id") @db.Uuid
+  period   Period? @relation(fields: [periodId], references: [id])
+
+  /// Set only on the reversing entry, pointing back at the entry it reverses.
+  reversesEntryId String?       @unique @map("reverses_entry_id") @db.Uuid
+  reversesEntry   JournalEntry? @relation("EntryReversal", fields: [reversesEntryId], references: [id])
+  reversedByEntry JournalEntry? @relation("EntryReversal")
+
+  /// Set when this entry was posted straight from a document's review screen (phase 4 —
+  /// apps/web/app/actions/postDocumentEntry.ts), not from manual entry or import. Purely
+  /// traceability (CLAUDE.md §7.2 — every posting must be traceable to what produced it);
+  /// unique because a document may only be posted once — post it again and you'd need a
+  /// reversing entry first, same rule as any other posted entry.
+  sourceDocumentId String?   @unique @map("source_document_id") @db.Uuid
+  sourceDocument   Document? @relation(fields: [sourceDocumentId], references: [id])
+
+  lines JournalLine[]
+
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  postedAt  DateTime? @map("posted_at") @db.Timestamptz(6)
+
+  @@index([tenantId])
+  @@index([tenantId, status])
+  @@index([periodId])
+  @@map("journal_entries")
+}
+
+/// One row per debit or credit leg. A DB trigger (see the migration) enforces that every
+/// entry's lines sum to zero (CLAUDE.md §2 rule 2) — deferred to transaction commit, so
+/// inserting an entry's lines one at a time within one transaction is fine.
+model JournalLine {
+  id       String @id @default(uuid(7)) @db.Uuid
+  tenantId String @map("tenant_id") @db.Uuid
+  tenant   Tenant @relation(fields: [tenantId], references: [id])
+
+  entryId   String       @map("entry_id") @db.Uuid
+  entry     JournalEntry @relation(fields: [entryId], references: [id])
+  accountId String       @map("account_id") @db.Uuid
+  account   Account      @relation(fields: [accountId], references: [id])
+
+  /// Exactly one of debit/credit is non-zero per line — enforced by a CHECK constraint,
+  /// not just convention (see the migration).
+  debit     Decimal @default(0) @db.Decimal(19, 4)
+  credit    Decimal @default(0) @db.Decimal(19, 4)
+  label     String?
+  /// Stable display order within an entry — insertion order alone isn't guaranteed
+  /// stable to query back out.
+  lineOrder Int     @map("line_order")
+
+  /// Set once a bank transaction (phase 7) is matched ("lettré") to this line — see
+  /// BankTransaction.matchedJournalLineId's comment for why the FK lives on that side.
+  matchedByBankTransaction BankTransaction?
+
+  @@index([tenantId])
+  @@index([entryId])
+  @@index([accountId])
+  @@map("journal_lines")
+}
+
+// ── Phase 3 (ADR 0007, build-order.md S4): historical journal import ────────
+
+/// One row per completed import — the idempotency key S4's definition of done requires
+/// ("a re-import of the same file changing nothing"). contentHash is a sha256 of the raw
+/// uploaded file's bytes; the (tenantId, contentHash) unique constraint is the actual
+/// idempotency mechanism, checked before any entry is created, not inferred after the
+/// fact from what got posted.
+model JournalImport {
+  id       String @id @default(uuid(7)) @db.Uuid
+  tenantId String @map("tenant_id") @db.Uuid
+  tenant   Tenant @relation(fields: [tenantId], references: [id])
+
+  filename    String
+  contentHash String @map("content_hash")
+  /// The header -> canonical-field mapping the user confirmed for this file
+  /// (build-order.md S4's "per-source mapping profile"). Kept for audit/replay of this
+  /// specific import; reusing it automatically as a named profile across different files
+  /// is a later refinement, not built here.
+  mapping Json
+
+  rowCount   Int @map("row_count")
+  entryCount Int @map("entry_count")
+
+  createdById String @map("created_by_id") @db.Uuid
+  createdBy   User   @relation(fields: [createdById], references: [id])
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@unique([tenantId, contentHash])
+  @@index([tenantId])
+  @@map("journal_imports")
+}
+
+// ── Phase 7 (ADR 0007, build-order.md S13): bank statement import + lettrage ────
+//
+// Per ADR 0003: file import only (CSV in this pass — MT940/CAMT.053 need real bank sample
+// files as fixtures, which don't exist yet; deferred, not silently dropped). Imported rows
+// land in this staging sub-ledger, never directly as JournalEntry rows (ADR 0003 point 4)
+// — matching ("lettrage") only *links* an already-posted JournalLine, it never creates or
+// edits one.
+
+/// One row per statement upload. Idempotency here is per-row (BankTransaction.sourceHash),
+/// not whole-file like JournalImport — a bank statement's date range legitimately overlaps
+/// the previous one (that's how you avoid gaps), so importedCount/skippedCount records how
+/// many of this file's rows were genuinely new vs already-seen duplicates.
+model BankStatementImport {
+  id       String @id @default(uuid(7)) @db.Uuid
+  tenantId String @map("tenant_id") @db.Uuid
+  tenant   Tenant @relation(fields: [tenantId], references: [id])
+
+  /// The tenant's own Account.code this statement is for (a 514x/516x sub-account) — not a
+  /// separate BankAccount entity; CGNC sub-accounting already gives each real bank account
+  /// its own code under 5141, so reusing that is simpler than a parallel model.
+  bankAccountCode String @map("bank_account_code")
+  filename        String
+  mapping         Json
+  rowCount        Int    @map("row_count")
+  importedCount   Int    @map("imported_count")
+  skippedCount    Int    @map("skipped_count")
+
+  createdById String @map("created_by_id") @db.Uuid
+  createdBy   User   @relation(fields: [createdById], references: [id])
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  transactions BankTransaction[]
+
+  @@index([tenantId])
+  @@map("bank_statement_imports")
+}
+
+enum BankTransactionStatus {
+  unmatched
+  matched
+
+  @@map("bank_transaction_status")
+}
+
+/// A row from an imported bank statement. `amount` follows the same debit-positive sign
+/// convention as an asset account: positive = money in (would match a debit line on the
+/// bank account), negative = money out (would match a credit line).
+model BankTransaction {
+  id       String @id @default(uuid(7)) @db.Uuid
+  tenantId String @map("tenant_id") @db.Uuid
+  tenant   Tenant @relation(fields: [tenantId], references: [id])
+
+  importId String               @map("import_id") @db.Uuid
+  import   BankStatementImport  @relation(fields: [importId], references: [id])
+
+  bankAccountCode String   @map("bank_account_code")
+  valueDate       DateTime @map("value_date") @db.Date
+  label           String
+  amount          Decimal  @db.Decimal(19, 4)
+  /// sha256 of the row's own normalized fields (date/label/amount/external ref if the bank
+  /// provided one) — deliberately not derived from the file, so the same real transaction
+  /// appearing in two overlapping statement exports hashes identically (ADR 0003 point 3).
+  sourceHash String @map("source_hash")
+
+  status BankTransactionStatus @default(unmatched)
+  /// Set once a human confirms a match — the FK lives here (not on JournalLine) because a
+  /// JournalLine predates any bank import and shouldn't need to know one exists; unique
+  /// because CLAUDE.md's append-only ledger means a line can't be un-matched by editing it,
+  /// only by a fresh confirm on a different transaction after this one is cleared.
+  matchedJournalLineId String?      @unique @map("matched_journal_line_id") @db.Uuid
+  matchedJournalLine   JournalLine? @relation(fields: [matchedJournalLineId], references: [id])
+  matchedAt            DateTime?    @map("matched_at") @db.Timestamptz(6)
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@unique([tenantId, bankAccountCode, sourceHash])
+  @@index([tenantId])
+  @@index([tenantId, status])
+  @@map("bank_transactions")
+}
+
+// ── Phase 9 (ADR 0007, build-order.md S8): outgoing invoices ────────────────
+
+/// Per-(tenant, series) counter, incremented inside the same transaction that finalises an
+/// invoice (CLAUDE.md §5.6 — "per-tenant, per-series database sequence inside the same
+/// transaction as the invoice insert"). The UPDATE that increments this row takes a
+/// Postgres row lock, so two concurrent finalisations serialise on it — the second waits
+/// for the first to commit or roll back, which is what makes "no gap, no reuse" hold under
+/// concurrency, not application-level locking.
+model InvoiceSeriesCounter {
+  id         String @id @default(uuid(7)) @db.Uuid
+  tenantId   String @map("tenant_id") @db.Uuid
+  tenant     Tenant @relation(fields: [tenantId], references: [id])
+  seriesCode String @map("series_code")
+  nextNumber Int    @default(1) @map("next_number")
+
+  @@unique([tenantId, seriesCode])
+  @@index([tenantId])
+  @@map("invoice_series_counters")
+}
+
+enum InvoiceStatus {
+  draft
+  finalized
+
+  @@map("invoice_status")
+}
+
+/// Draft invoices are freely editable and unnumbered (deleted and recreated rather than
+/// edited in place, this phase — no in-place draft editor yet); a finalized invoice is
+/// append-only (CLAUDE.md §5.6), enforced by a trigger mirroring journal_entries'. Corrections
+/// go through an avoir (a second Invoice row, isAvoir=true), never an edit.
+model Invoice {
+  id       String @id @default(uuid(7)) @db.Uuid
+  tenantId String @map("tenant_id") @db.Uuid
+  tenant   Tenant @relation(fields: [tenantId], references: [id])
+
+  /// Both null while draft; set atomically with the counter increment at finalisation.
+  seriesCode String? @map("series_code")
+  number     Int?
+  /// Display string once finalized (e.g. "FA-2026-000123") — a rendering, not a second
+  /// source of truth; always derivable from seriesCode+number+issueDate's year.
+  fullNumber String? @map("full_number")
+
+  status InvoiceStatus @default(draft)
+
+  customerName String  @map("customer_name")
+  customerIce  String? @map("customer_ice")
+  customerIf   String? @map("customer_if")
+
+  issueDate    DateTime @map("issue_date") @db.Date
+  paymentTerms String?  @map("payment_terms")
+
+  /// Snapshot of the totals computed at finalisation time (packages/accounting's TVA
+  /// engine) — never recomputed from live rate config afterward, since the invoice itself
+  /// is immutable and a later rate change must not retroactively change a finalized total.
+  totalHt  Decimal @default(0) @db.Decimal(19, 4) @map("total_ht")
+  totalTva Decimal @default(0) @db.Decimal(19, 4) @map("total_tva")
+  totalTtc Decimal @default(0) @db.Decimal(19, 4) @map("total_ttc")
+
+  isAvoir          Boolean  @default(false) @map("is_avoir")
+  avoirOfInvoiceId String?  @unique @map("avoir_of_invoice_id") @db.Uuid
+  avoirOfInvoice   Invoice? @relation("InvoiceAvoir", fields: [avoirOfInvoiceId], references: [id])
+  avoirInvoice     Invoice? @relation("InvoiceAvoir")
+
+  lines InvoiceLine[]
+
+  createdById String    @map("created_by_id") @db.Uuid
+  createdBy   User      @relation(fields: [createdById], references: [id])
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  finalizedAt DateTime? @map("finalized_at") @db.Timestamptz(6)
+
+  @@unique([tenantId, seriesCode, number])
+  @@index([tenantId])
+  @@index([tenantId, status])
+  @@map("invoices")
+}
+
+model InvoiceLine {
+  id       String @id @default(uuid(7)) @db.Uuid
+  tenantId String @map("tenant_id") @db.Uuid
+  tenant   Tenant @relation(fields: [tenantId], references: [id])
+
+  invoiceId String  @map("invoice_id") @db.Uuid
+  invoice   Invoice @relation(fields: [invoiceId], references: [id])
+
+  description String
+  quantity    Decimal @db.Decimal(19, 4)
+  unitPriceHt Decimal @map("unit_price_ht") @db.Decimal(19, 4)
+  /// References a TvaRate.rateCode (phase 8) — not a hard FK, since TvaRate rows can be
+  /// superseded by a later effective-dated row sharing the same code; validated by
+  /// resolution at finalisation time, same as document TVA breakdown.
+  rateCode  String  @map("rate_code")
+  lineOrder Int     @map("line_order")
+
+  @@index([tenantId])
+  @@index([invoiceId])
+  @@map("invoice_lines")
+}
+
+// ── Phase 11 (ADR 0007, build-order.md S10): TVA declaration + SIMPL export ──
+
+enum TvaFilingFrequency {
+  monthly
+  quarterly
+
+  @@map("tva_filing_frequency")
+}
+
+/// One row per export — the audit record CLAUDE.md §5.3 requires ("log what was
+/// exported"). `adapterVersion` is always `"placeholder-v0"` today (see
+/// packages/accounting/src/filings/simpl — the real DGI format is TODO(legal) L-22);
+/// stored so a later real adapter's exports are distinguishable from this placeholder's
+/// in the trail, not because a version choice happens per export.
+model TvaDeclarationExport {
+  id       String @id @default(uuid(7)) @db.Uuid
+  tenantId String @map("tenant_id") @db.Uuid
+  tenant   Tenant @relation(fields: [tenantId], references: [id])
+
+  periodStart DateTime   @map("period_start") @db.Date
+  periodEnd   DateTime   @map("period_end") @db.Date
+  /// Snapshot of the tenant's regime at export time — null if never set (CLAUDE.md §5.3:
+  /// never assumed), kept even though it isn't wired into the figures yet (see
+  /// build-order.md's S10 scope note).
+  regime          TvaRegime?
+  totalCollectee  Decimal @map("total_collectee") @db.Decimal(19, 4)
+  totalDeductible Decimal @map("total_deductible") @db.Decimal(19, 4)
+  /// Positive = due to the DGI; negative = crédit de TVA reporté.
+  totalDue Decimal @map("total_due") @db.Decimal(19, 4)
+
+  adapterVersion String @map("adapter_version")
+
+  exportedById String   @map("exported_by_id") @db.Uuid
+  exportedBy   User     @relation(fields: [exportedById], references: [id])
+  exportedAt   DateTime @default(now()) @map("exported_at") @db.Timestamptz(6)
+
+  @@index([tenantId])
+  @@map("tva_declaration_exports")
+}
+
+// ── Phase 12 (ADR 0007, build-order.md S11): retenue à la source ────────────
+//
+// Global reference data, same status as TvaRate/ReferenceAccount. Unlike TVA's rates
+// (CLAUDE.md §5.3 itself states 20/14/10/7%), CLAUDE.md §5.4 gives no RAS rate at all —
+// only payment-nature category names — and docs/legal-inputs.md L-38 (the complete
+// payment-nature list) is TODO(legal). So this table ships with **zero seeded rows**
+// (see packages/db/src/seed.ts): every real evaluation flags for human review, which is
+// exactly CLAUDE.md §5.4's required behaviour ("never default to no retenue"), not a gap
+// masked by an invented placeholder number the way the TVA cash threshold would have
+// been.
+
+enum RasLiabilityTrigger {
+  invoice_date
+  payment_date
+
+  @@map("ras_liability_trigger")
+}
+
+/// `(paymentNature, payeeType, residentStatus, effectiveFrom, effectiveTo) → rate` per
+/// CLAUDE.md §5.4 — deliberately free-text `paymentNature`/`payeeType`/`residentStatus`
+/// rather than enums, since the real category lists (L-38, L-42) aren't known yet and an
+/// enum would have to guess at their members.
+model RasRule {
+  id              String @id @default(uuid(7)) @db.Uuid
+  paymentNature   String @map("payment_nature")
+  payeeType       String @map("payee_type")
+  residentStatus  String @map("resident_status")
+  rate            Decimal @db.Decimal(6, 4)
+  baseDescription String  @map("base_description")
+  /// Which date determines whether a payment falls under this rule — CLAUDE.md §5.4:
+  /// never assumed to be always invoice date or always payment date.
+  liabilityTrigger RasLiabilityTrigger @map("liability_trigger")
+  effectiveFrom    DateTime            @map("effective_from") @db.Date
+  effectiveTo      DateTime?           @map("effective_to") @db.Date
+  isPlaceholder    Boolean             @default(true) @map("is_placeholder")
+  legalSourceNote  String?             @map("legal_source_note")
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@unique([paymentNature, payeeType, residentStatus, effectiveFrom])
+  @@map("ras_rules")
+}
+
+enum RasWithholdingStatus {
+  flagged
+  computed
+
+  @@map("ras_withholding_status")
+}
+
+/// One row per payment a user evaluated against RasRule — persisted regardless of outcome
+/// (flagged or computed), so a "flagged, needs review" payment isn't silently lost the
+/// way CLAUDE.md §5.4 warns against.
+model RasWithholding {
+  id       String @id @default(uuid(7)) @db.Uuid
+  tenantId String @map("tenant_id") @db.Uuid
+  tenant   Tenant @relation(fields: [tenantId], references: [id])
+
+  payeeName      String   @map("payee_name")
+  payeeType      String   @map("payee_type")
+  residentStatus String   @map("resident_status")
+  paymentNature  String   @map("payment_nature")
+  invoiceDate    DateTime @map("invoice_date") @db.Date
+  paymentDate    DateTime @map("payment_date") @db.Date
+  baseAmount     Decimal  @map("base_amount") @db.Decimal(19, 4)
+
+  status        RasWithholdingStatus @default(flagged)
+  matchedRateAtEval Decimal?          @map("matched_rate_at_eval") @db.Decimal(6, 4)
+  rasAmount     Decimal?             @map("ras_amount") @db.Decimal(19, 4)
+  netPayable    Decimal?             @map("net_payable") @db.Decimal(19, 4)
+
+  createdById String   @map("created_by_id") @db.Uuid
+  createdBy   User     @relation(fields: [createdById], references: [id])
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@index([tenantId])
+  @@index([tenantId, status])
+  @@map("ras_withholdings")
+}
+
+// ── Phase 13 (ADR 0007, build-order.md S12): IS passage table ───────────────
+//
+// Global reference data (IsBracket, IsCotisationMinimaleConfig), same status as
+// TvaRate/RasRule. CLAUDE.md §5.5 gives no bracket rates, no cotisation minimale rate, no
+// standard réintégrations list — unlike TVA, there is nothing to seed even as a labelled
+// placeholder, so both tables ship with zero rows (see packages/db/src/seed.ts). The
+// worksheet (IsPassageWorksheet/IsPassageLine) is tenant-owned and real regardless: it
+// snapshots the real résultat comptable (phase 10's CPC) and lets a human add
+// réintégration/déduction lines, each required to carry its own explanation
+// (CLAUDE.md §5.5's "every pre-filled line must carry an explanation").
+
+model IsBracket {
+  id            String    @id @default(uuid(7)) @db.Uuid
+  minIncome     Decimal   @map("min_income") @db.Decimal(19, 4)
+  /// Null = no upper bound (the top bracket).
+  maxIncome     Decimal?  @map("max_income") @db.Decimal(19, 4)
+  rate          Decimal   @db.Decimal(6, 4)
+  effectiveFrom DateTime  @map("effective_from") @db.Date
+  effectiveTo   DateTime? @map("effective_to") @db.Date
+  isPlaceholder Boolean   @default(true) @map("is_placeholder")
+  legalSourceNote String? @map("legal_source_note")
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@map("is_brackets")
+}
+
+model IsCotisationMinimaleConfig {
+  id              String    @id @default(uuid(7)) @db.Uuid
+  rate            Decimal   @db.Decimal(6, 4)
+  minimumAmount   Decimal   @map("minimum_amount") @db.Decimal(19, 4)
+  effectiveFrom   DateTime  @map("effective_from") @db.Date
+  effectiveTo     DateTime? @map("effective_to") @db.Date
+  isPlaceholder   Boolean   @default(true) @map("is_placeholder")
+  legalSourceNote String?   @map("legal_source_note")
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@map("is_cotisation_minimale_configs")
+}
+
+enum IsWorksheetStatus {
+  draft
+  validated
+
+  @@map("is_worksheet_status")
+}
+
+/// A snapshot, not a live view — résultatComptable is frozen at creation time so a later
+/// ledger correction doesn't retroactively change an already-reviewed worksheet.
+/// "Validated" is a lighter guarantee than the ledger's DB-enforced immutability
+/// (CLAUDE.md §2 rule 3): an app-level check on the add-line action, not a trigger — this
+/// is a working paper toward a filing, not the ledger itself.
+model IsPassageWorksheet {
+  id       String @id @default(uuid(7)) @db.Uuid
+  tenantId String @map("tenant_id") @db.Uuid
+  tenant   Tenant @relation(fields: [tenantId], references: [id])
+
+  periodStart       DateTime @map("period_start") @db.Date
+  periodEnd         DateTime @map("period_end") @db.Date
+  resultatComptable Decimal  @map("resultat_comptable") @db.Decimal(19, 4)
+
+  status       IsWorksheetStatus @default(draft)
+  validatedById String?          @map("validated_by_id") @db.Uuid
+  validatedBy   User?            @relation("IsWorksheetValidatedBy", fields: [validatedById], references: [id])
+  validatedAt   DateTime?        @map("validated_at") @db.Timestamptz(6)
+
+  lines IsPassageLine[]
+
+  createdById String   @map("created_by_id") @db.Uuid
+  createdBy   User     @relation("IsWorksheetCreatedBy", fields: [createdById], references: [id])
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@index([tenantId])
+  @@map("is_passage_worksheets")
+}
+
+enum IsAdjustmentKind {
+  reintegration
+  deduction
+
+  @@map("is_adjustment_kind")
+}
+
+model IsPassageLine {
+  id       String @id @default(uuid(7)) @db.Uuid
+  tenantId String @map("tenant_id") @db.Uuid
+  tenant   Tenant @relation(fields: [tenantId], references: [id])
+
+  worksheetId String             @map("worksheet_id") @db.Uuid
+  worksheet   IsPassageWorksheet @relation(fields: [worksheetId], references: [id])
+
+  kind        IsAdjustmentKind
+  label       String
+  amount      Decimal @db.Decimal(19, 4)
+  /// Required, not optional — CLAUDE.md §5.5: "every pre-filled line must carry an
+  /// explanation."
+  explanation String
+  lineOrder   Int     @map("line_order")
+
+  @@index([tenantId])
+  @@index([worksheetId])
+  @@map("is_passage_lines")
 }

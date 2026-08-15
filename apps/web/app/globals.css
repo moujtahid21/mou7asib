@@ -1,4 +1,10 @@
 @import "tailwindcss";
+@import "@mou7asib/ui/tokens.css";
+
+body {
+  background: var(--color-bg);
+  color: var(--color-fg);
+}
 
 /* CLAUDE.md §10 — respect prefers-reduced-motion from the start. */
 @media (prefers-reduced-motion: reduce) {

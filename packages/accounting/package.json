@@ -1,0 +1,22 @@
+{
+  "name": "@mou7asib/accounting",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Pure double-entry engine — no I/O, no Prisma, no Date.now() (CLAUDE.md §3). Dates and account resolution are always injected by the caller.",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "decimal.js": "10.6.0"
+  },
+  "devDependencies": {
+    "fast-check": "4.9.0",
+    "typescript": "7.0.2",
+    "vitest": "4.1.10"
+  }
+}

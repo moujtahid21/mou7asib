@@ -91,8 +91,8 @@ export default function ProcessingStatus({
   const elapsedMinutes = Math.floor((now - new Date(uploadedAt).getTime()) / 60000);
 
   return (
-    <main className="mx-auto max-w-md p-6">
-      <h1 className="text-xl font-semibold">Traitement en cours</h1>
+    <main className="mx-auto max-w-md rounded-xl border border-border bg-surface p-6 shadow-card">
+      <h1 className="m-0 text-xl font-semibold text-fg">Traitement en cours</h1>
 
       <ol className="mt-6 flex items-center gap-2">
         {STEPS.map((step, index) => (
@@ -100,25 +100,23 @@ export default function ProcessingStatus({
             <span
               className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-medium ${
                 index < currentStepIndex
-                  ? "bg-slate-900 text-white"
+                  ? "bg-fg text-bg"
                   : index === currentStepIndex
-                    ? "border-2 border-slate-900 text-slate-900"
-                    : "border border-slate-300 text-slate-400"
+                    ? "border-2 border-fg text-fg"
+                    : "border border-border-2 text-fg-3"
               }`}
             >
               {index < currentStepIndex ? "✓" : index + 1}
             </span>
-            <span
-              className={`text-xs ${index <= currentStepIndex ? "text-slate-900" : "text-slate-400"}`}
-            >
+            <span className={`text-xs ${index <= currentStepIndex ? "text-fg" : "text-fg-3"}`}>
               {STEP_LABELS_FR[step]}
             </span>
-            {index < STEPS.length - 1 && <span className="h-px flex-1 bg-slate-200" />}
+            {index < STEPS.length - 1 && <span className="h-px flex-1 bg-border" />}
           </li>
         ))}
       </ol>
 
-      <p className="mt-6 text-sm text-slate-600">
+      <p className="mt-6 text-sm text-fg-2">
         {currentStep === "queued" && `En attente de traitement ${formatElapsed(uploadedAt, now)}.`}
         {currentStep === "processing" &&
           `Extraction en cours ${formatElapsed(uploadedAt, now)} — généralement plusieurs minutes sur cet appareil.`}
@@ -126,7 +124,7 @@ export default function ProcessingStatus({
       </p>
 
       {currentStep === "processing" && elapsedMinutes >= REASSURANCE_THRESHOLD_MINUTES && (
-        <p className="mt-2 text-xs text-slate-500">
+        <p className="mt-2 text-xs text-fg-3">
           Toujours en cours après {elapsedMinutes} min — c&apos;est normal sur cet appareil pour
           une extraction par photo/scan. Pas besoin de relancer.
         </p>

@@ -1,0 +1,74 @@
+/*
+ * Design tokens ported from `Mou7asib Workspace.dc.html`'s :root / :root[data-m7-theme="dark"]
+ * blocks. CLAUDE.md §10: "design tokens defined once in the theme, no arbitrary values
+ * scattered in markup" — this file is that one place. Components read them via Tailwind
+ * utilities (bg-surface, text-fg-2, border-border, ...) generated from the @theme block below,
+ * never as inline hex/rgb.
+ *
+ * Theme switching: AppShell sets data-m7-theme="dark"|"light" on <html>. The @theme block
+ * below defines the light values (Tailwind's default); the plain :root[data-m7-theme="dark"]
+ * rule after it overrides the same custom properties at runtime — Tailwind's generated
+ * utilities reference var(--color-*), so the override is picked up without rebuilding CSS.
+ */
+
+/*
+ * Without this, Tailwind's automatic content scan never finds the class names used in
+ * this package's .tsx files: @mou7asib/ui is consumed through a workspace symlink into
+ * apps/web/node_modules, and Tailwind v4 excludes node_modules from auto-detection by
+ * design. Declaring the real source directory here (co-located with the tokens the
+ * components read) fixes it for every consumer that imports this file, not just apps/web.
+ */
+@source "./";
+
+@theme {
+  --color-bg: #f8fafc;
+  --color-surface: #ffffff;
+  --color-surface-2: #f1f5f9;
+  --color-surface-3: #f8fafc;
+  --color-border: #e2e8f0;
+  --color-border-2: #cbd5e1;
+
+  --color-fg: #0f172a;
+  --color-fg-2: #475569;
+  --color-fg-3: #94a3b8;
+
+  --color-pos: #059669;
+  --color-pos-bg: #ecfdf5;
+  --color-neg: #e11d48;
+  --color-neg-bg: #fff1f2;
+  --color-warn: #b45309;
+  --color-warn-bg: #fffbeb;
+  --color-ai: #6d28d9;
+  --color-ai-bg: #f5f3ff;
+  --color-ai-border: #ddd6fe;
+
+  --shadow-card: 0 1px 2px rgba(15, 23, 42, 0.06), 0 1px 3px rgba(15, 23, 42, 0.04);
+
+  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, monospace;
+}
+
+:root[data-m7-theme="dark"] {
+  --color-bg: #020617;
+  --color-surface: #0f172a;
+  --color-surface-2: #1a2437;
+  --color-surface-3: #131d31;
+  --color-border: #243349;
+  --color-border-2: #334155;
+
+  --color-fg: #f1f5f9;
+  --color-fg-2: #94a3b8;
+  --color-fg-3: #64748b;
+
+  --color-pos: #34d399;
+  --color-pos-bg: #052e23;
+  --color-neg: #fb7185;
+  --color-neg-bg: #3f0d1c;
+  --color-warn: #fbbf24;
+  --color-warn-bg: #3a2a06;
+  --color-ai: #a78bfa;
+  --color-ai-bg: #1f1b3d;
+  --color-ai-border: #4c1d95;
+
+  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.4);
+}
