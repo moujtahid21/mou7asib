@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import QRCode from "qrcode";
 import { prisma } from "@mou7asib/db";
 import { getPendingSetupUserId, totpProvisioningUri } from "@/lib/auth";
 import ConfirmMfaForm from "./ConfirmMfaForm";
@@ -20,24 +21,31 @@ export default async function SignupMfaPage() {
   }
 
   const provisioningUri = totpProvisioningUri(user.email, user.totpSecret);
+  const qrCodeDataUrl = await QRCode.toDataURL(provisioningUri, { margin: 1, width: 220 });
 
   return (
     <main className="mx-auto flex min-h-dvh max-w-sm flex-col justify-center p-6">
       <h1 className="text-xl font-semibold text-fg">Configurer l&apos;authentification à deux facteurs</h1>
       <p className="mt-1.5 text-sm text-fg-2">
-        Obligatoire pour le rôle owner (CLAUDE.md §8.2). Ajoutez ce compte dans une
-        application d&apos;authentification (Google Authenticator, 1Password, Authy…), puis
-        saisissez le code généré.
+        Obligatoire pour le rôle owner (CLAUDE.md §8.2). Scannez ce code avec une application
+        d&apos;authentification (Google Authenticator, 1Password, Authy…), puis saisissez le
+        code généré.
       </p>
 
-      <div className="mt-5 rounded-lg border border-border bg-surface-2 p-3">
-        <p className="text-xs font-medium text-fg-2">Clé de configuration manuelle</p>
-        <p className="mt-1 break-all font-mono text-sm text-fg">{user.totpSecret}</p>
-        <p className="mt-2 text-xs text-fg-3">
-          Ou collez cette URI dans une application compatible :{" "}
-          <span className="break-all font-mono">{provisioningUri}</span>
-        </p>
-      </div>
+      <img
+        src={qrCodeDataUrl}
+        alt="Code QR de configuration de l'authentification à deux facteurs"
+        width={220}
+        height={220}
+        className="mx-auto mt-5 rounded-lg border border-border bg-white p-2"
+      />
+
+      <details className="mt-4 rounded-lg border border-border bg-surface-2 p-3">
+        <summary className="cursor-pointer text-xs font-medium text-fg-2">
+          Impossible de scanner ? Saisir la clé manuellement
+        </summary>
+        <p className="mt-2 break-all font-mono text-sm text-fg">{user.totpSecret}</p>
+      </details>
 
       <ConfirmMfaForm />
     </main>
