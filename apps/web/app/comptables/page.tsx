@@ -5,6 +5,8 @@ import ComptablesPanel, { type AccountantAccessRow } from "./ComptablesPanel";
 
 export const dynamic = "force-dynamic";
 
+const dateFormatter = new Intl.DateTimeFormat("fr-MA", { dateStyle: "medium", timeZone: "Africa/Casablanca" });
+
 const ERROR_MESSAGES: Record<string, string> = {
   forbidden: "Action non autorisée pour ce rôle.",
   invalid: "Formulaire invalide.",
@@ -46,27 +48,25 @@ export default async function ComptablesPage({
     accountantEmail: row.accountant.email,
     scope: row.scope,
     grantedByEmail: row.grantedBy.email,
-    expiresAt: row.expiresAt.toISOString().slice(0, 10),
+    expiresAt: dateFormatter.format(row.expiresAt),
     status: row.revokedAt !== null ? "revoked" : row.expiresAt < now ? "expired" : "active",
-    revokedAt: row.revokedAt?.toISOString().slice(0, 10) ?? null,
+    revokedAt: row.revokedAt !== null ? dateFormatter.format(row.revokedAt) : null,
   }));
 
   return (
-    <main className="mx-auto flex max-w-4xl flex-col gap-4 p-4">
-      <div>
-        <h1 className="m-0 text-lg font-semibold text-fg">Comptables</h1>
-        <p className="mt-1 text-[12px] text-fg-2">
-          Accès scopé et daté pour un expert-comptable / fiduciaire externe — ADR 0004, phase 14.
-          Aucun connecteur Sage/Cegid n&apos;existe encore (discovery non faite, voir l&apos;ADR) : cet
-          écran couvre uniquement l&apos;accès direct dans mou7asib.
-        </p>
+    <div className="mx-auto flex max-w-4xl flex-col gap-4">
+      <div className="rounded-xl border border-dashed border-border-2 bg-surface-3 p-3.5 text-[12.5px] text-fg-2">
+        <strong className="font-semibold text-fg">Comptables</strong> — accès scopé et daté pour un
+        expert-comptable / fiduciaire externe (ADR 0004, phase 14). Aucun connecteur Sage/Cegid
+        n&apos;existe encore (discovery non faite, voir l&apos;ADR) : cet écran couvre uniquement
+        l&apos;accès direct dans mou7asib.
       </div>
 
       {errorMessage !== null && (
-        <p className="rounded-lg border border-neg/30 bg-neg-bg px-3 py-2 text-[12px] text-neg">{errorMessage}</p>
+        <p role="alert" className="rounded-xl border border-neg bg-neg-bg p-3 text-sm text-neg">{errorMessage}</p>
       )}
 
       <ComptablesPanel canManage={canManage} grants={grants} />
-    </main>
+    </div>
   );
 }

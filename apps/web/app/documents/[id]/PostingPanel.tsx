@@ -119,11 +119,19 @@ export default function PostingPanel({
   const ttcForThresholdCheck = tvaBreakdown?.totalTtc ?? defaultAmount;
   const exceedsThreshold =
     isCash && cashThreshold !== null && ttcForThresholdCheck !== null && Number(ttcForThresholdCheck) > Number(cashThreshold);
+  // The ai- tokens mean "AI touched this" (Copilote button, "Précédent utilisé" callout) —
+  // reserve them for when a suggestion or TVA breakdown actually informed the prefill.
+  // Pure manual entry (no suggestion, no extracted TVA lines) gets the neutral chrome
+  // every other form in the app uses, so the accent keeps its meaning.
+  const hasAiInvolvement = suggestion !== null || tvaBreakdown !== null;
 
   return (
-    <form action={formAction} className="mt-3 rounded-xl border border-ai-border bg-ai-bg p-3.5">
+    <form
+      action={formAction}
+      className={`mt-3 rounded-xl border p-3.5 ${hasAiInvolvement ? "border-ai-border bg-ai-bg" : "border-border bg-surface"}`}
+    >
       <div className="flex items-center justify-between gap-2">
-        <h2 className="m-0 text-[13px] font-semibold text-ai">Comptabiliser ce document</h2>
+        <h2 className={`m-0 text-[13px] font-semibold ${hasAiInvolvement ? "text-ai" : "text-fg"}`}>Comptabiliser ce document</h2>
         <span className="rounded-md border border-border bg-surface px-1.5 py-0.5 font-mono text-[10.5px] font-semibold text-fg-2">
           Saisie manuelle — non comptabilisé
         </span>
@@ -249,13 +257,13 @@ export default function PostingPanel({
       </div>
 
       <div className="mt-3 overflow-x-auto">
-        <table className="w-full min-w-[480px] border-collapse text-sm">
+        <table className="w-full min-w-[420px] table-fixed border-collapse text-sm">
           <thead>
             <tr className="text-xs text-fg-2">
-              <th scope="col" className="p-1 text-start font-medium">Compte</th>
+              <th scope="col" className="w-28 p-1 text-start font-medium">Compte</th>
               <th scope="col" className="p-1 text-start font-medium">Libellé ligne</th>
-              <th scope="col" className="p-1 text-end font-medium">Débit</th>
-              <th scope="col" className="p-1 text-end font-medium">Crédit</th>
+              <th scope="col" className="w-24 p-1 text-end font-medium">Débit</th>
+              <th scope="col" className="w-24 p-1 text-end font-medium">Crédit</th>
             </tr>
           </thead>
           <tbody>
@@ -267,14 +275,14 @@ export default function PostingPanel({
                     list="posting-account-codes"
                     placeholder="ex. 6111"
                     defaultValue={row.accountCode}
-                    className="w-28 rounded border border-border-2 bg-surface px-2 py-1 font-mono text-xs"
+                    className="w-full min-w-0 rounded border border-border-2 bg-surface px-2 py-1 font-mono text-xs"
                   />
                 </td>
                 <td className="p-1">
                   <input
                     name={`label_${i}`}
                     defaultValue={row.label}
-                    className="w-full rounded border border-border-2 bg-surface px-2 py-1 text-xs"
+                    className="w-full min-w-0 rounded border border-border-2 bg-surface px-2 py-1 text-xs"
                   />
                 </td>
                 <td className="p-1">
@@ -283,7 +291,7 @@ export default function PostingPanel({
                     inputMode="decimal"
                     placeholder="0.00"
                     defaultValue={row.debit}
-                    className="w-28 rounded border border-border-2 bg-surface px-2 py-1 text-end font-mono text-xs tabular-nums"
+                    className="w-full min-w-0 rounded border border-border-2 bg-surface px-2 py-1 text-end font-mono text-xs tabular-nums"
                   />
                 </td>
                 <td className="p-1">
@@ -292,7 +300,7 @@ export default function PostingPanel({
                     inputMode="decimal"
                     placeholder="0.00"
                     defaultValue={row.credit}
-                    className="w-28 rounded border border-border-2 bg-surface px-2 py-1 text-end font-mono text-xs tabular-nums"
+                    className="w-full min-w-0 rounded border border-border-2 bg-surface px-2 py-1 text-end font-mono text-xs tabular-nums"
                   />
                 </td>
               </tr>

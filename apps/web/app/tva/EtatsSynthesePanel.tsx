@@ -102,6 +102,10 @@ export default function EtatsSynthesePanel({ bilan, cpc }: { bilan: BilanData; c
           </div>
           <h3 className="m-0 mt-3 text-xs font-semibold uppercase tracking-wide text-fg-2">Passif</h3>
           <LineTable lines={bilan.passif} tone="fg" />
+          <div className="flex justify-between border-t border-border p-1.5 text-sm text-fg-2">
+            <span>Résultat de l&apos;exercice</span>
+            <span className="font-mono tabular-nums">{bilan.resultatNet}</span>
+          </div>
           <div className="flex justify-between p-1.5 text-sm font-semibold text-fg">
             <span>Total passif</span>
             <span className="font-mono tabular-nums">{bilan.totalPassif}</span>

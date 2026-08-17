@@ -287,9 +287,17 @@ export default async function DashboardPage() {
             <p className="m-0 text-[10.5px] uppercase tracking-wide text-fg-3">61–90 j</p>
             <p className="mt-1 font-mono text-sm font-semibold text-fg">{fmt(aging.d61to90)}</p>
           </div>
-          <div className="rounded-lg border border-warn/30 bg-warn-bg p-2.5 text-center">
-            <p className="m-0 text-[10.5px] uppercase tracking-wide text-warn">90+ j</p>
-            <p className="mt-1 font-mono text-sm font-semibold text-warn">{fmt(aging.d90plus)}</p>
+          <div
+            className={`rounded-lg p-2.5 text-center ${
+              aging.d90plus.greaterThan(0) ? "border border-warn/30 bg-warn-bg" : "border border-border-2"
+            }`}
+          >
+            <p className={`m-0 text-[10.5px] uppercase tracking-wide ${aging.d90plus.greaterThan(0) ? "text-warn" : "text-fg-3"}`}>
+              90+ j
+            </p>
+            <p className={`mt-1 font-mono text-sm font-semibold ${aging.d90plus.greaterThan(0) ? "text-warn" : "text-fg"}`}>
+              {fmt(aging.d90plus)}
+            </p>
           </div>
         </div>
       </div>

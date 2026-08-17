@@ -55,7 +55,13 @@ export default function InvoiceList({ invoices, canWrite }: { invoices: InvoiceR
                 <span className="text-[12.5px] text-fg-2">{invoice.customerName}</span>
                 <span className="font-mono text-[11px] text-fg-3">{invoice.issueDate}</span>
                 <span className="ms-auto font-mono text-sm font-semibold tabular-nums text-fg">
-                  {invoice.totalTtc} MAD
+                  {invoice.status === "finalized" ? (
+                    `${invoice.totalTtc} MAD`
+                  ) : (
+                    <span className="text-fg-3" title="Le total TTC n'est calculé qu'à la finalisation">
+                      — MAD
+                    </span>
+                  )}
                 </span>
               </div>
 
