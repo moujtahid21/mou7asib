@@ -8,7 +8,9 @@ import { NextResponse, type NextRequest } from "next/server";
 const SESSION_COOKIE = "m7_session";
 // Prefix match, not exact — "/signup" must also cover "/signup/mfa" (the mandatory-MFA
 // step between account creation and a real session existing, see actions/signup.ts).
-const PUBLIC_PATH_PREFIXES = ["/login", "/signup"];
+// "/forgot-password" and "/reset-password" are the same shape: no session exists yet,
+// by definition, for a user who needs to reset their password.
+const PUBLIC_PATH_PREFIXES = ["/login", "/signup", "/forgot-password", "/reset-password"];
 
 export function proxy(request: NextRequest): NextResponse {
   const { pathname } = request.nextUrl;

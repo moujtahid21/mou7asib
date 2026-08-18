@@ -99,7 +99,7 @@ export default async function RootLayout({
           onToggleLocale={toggleLocale}
           onLogout={logout}
           strings={getShellStrings(locale)}
-          chromelessPrefixes={["/login", "/signup"]}
+          chromelessPrefixes={["/login", "/signup", "/forgot-password", "/reset-password"]}
         >
           {children}
         </AppShell>

@@ -120,6 +120,7 @@ model User {
 
   memberships          TenantMembership[]
   sessions             Session[]
+  passwordResetTokens  PasswordResetToken[]
   auditLogs            AuditLog[]
   journalImports       JournalImport[]
   bankStatementImports BankStatementImport[]
@@ -220,6 +221,26 @@ model Session {
   @@index([userId])
   @@index([tenantId])
   @@map("sessions")
+}
+
+/// Forgot-password flow. Same "never store the reversible form" pattern as Session's
+/// tokenHash — the raw token only ever exists in the emailed link and this row's hash.
+/// Single-use (usedAt) and short-lived (expiresAt) since it's a bearer credential that
+/// resets a password with no other proof of identity. Does NOT touch totpSecret/
+/// totpEnabled — resetting a password never bypasses MFA (CLAUDE.md §8.2's requirement
+/// stays enforced by login.ts exactly as before; this table can't turn it off).
+model PasswordResetToken {
+  id     String @id @default(uuid(7)) @db.Uuid
+  userId String @map("user_id") @db.Uuid
+  user   User   @relation(fields: [userId], references: [id])
+
+  tokenHash String    @unique @map("token_hash")
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  expiresAt DateTime  @map("expires_at") @db.Timestamptz(6)
+  usedAt    DateTime? @map("used_at") @db.Timestamptz(6)
+
+  @@index([userId])
+  @@map("password_reset_tokens")
 }
 
 /// Append-only by convention (no update/delete call site exists) — CLAUDE.md §13's audit

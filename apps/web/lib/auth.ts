@@ -61,7 +61,10 @@ export function verifyTotp(secret: string, token: string): boolean {
 
 // ── Sessions ─────────────────────────────────────────────────────────────
 
-function hashToken(token: string): string {
+// Exported: the password-reset flow (actions/requestPasswordReset.ts,
+// actions/resetPassword.ts) hashes its own bearer token the same way, for the same
+// reason — never persist a reversible form of a credential that grants access.
+export function hashToken(token: string): string {
   return crypto.createHash("sha256").update(token).digest("hex");
 }
 

@@ -49,6 +49,7 @@ export type {
   Role,
   TenantMembership,
   Session,
+  PasswordResetToken,
   AuditLog,
   ReferenceAccount,
   Account,
