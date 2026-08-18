@@ -27,6 +27,11 @@ surrounding prose, no markdown fences:
 
 Rules:
 - Use null for any field you cannot confidently read. Never guess or invent a value.
+- Date fields (invoice_date, due_date) must be either a complete, unambiguous date in \
+YYYY-MM-DD format, or null. If any part of the date is smudged, cropped, rotated, or \
+otherwise unclear, output null for that field — never output a partial date, placeholder \
+characters (e.g. "...", "??"), or your best guess annotated with punctuation. A null date \
+is a correct answer; a malformed date string is not.
 - Amounts are decimal strings (e.g. "1200.00"), never floats with rounding artifacts.
 - tva_lines is a list: one entry per distinct TVA rate present on the document. A \
 single-rate invoice has exactly one entry.
