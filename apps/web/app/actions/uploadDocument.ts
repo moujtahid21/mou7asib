@@ -75,9 +75,29 @@ export async function uploadDocument(
     return { error: "Format non pris en charge. Utilisez une photo JPEG/PNG ou un PDF." };
   }
 
-  const scanResult = await scanBufferForMalware(originalBytes);
-  if (scanResult.isInfected) {
-    return { error: "Le fichier a été rejeté par l'analyse antivirus." };
+  // CLAUDE.md §8.4 requires every upload scanned before it's trusted with
+  // anything else, and §15 bans a silent "temporary" bypass of that — so a
+  // scanner that can't be reached still fails the upload by default. The one
+  // way past that is ALLOW_UNSCANNED_UPLOADS, an explicit, loud opt-out (not
+  // a default): production currently has nowhere to run clamd (Vercel is
+  // serverless, no persistent daemon — see docs/decision-log.md), a real,
+  // tracked gap, not a hidden one. Every document that goes through without
+  // being scanned is logged server-side so there's a paper trail once a real
+  // scanner host exists to point CLAMD_HOST at.
+  try {
+    const scanResult = await scanBufferForMalware(originalBytes);
+    if (scanResult.isInfected) {
+      return { error: "Le fichier a été rejeté par l'analyse antivirus." };
+    }
+  } catch (error: unknown) {
+    if (process.env["ALLOW_UNSCANNED_UPLOADS"] !== "true") {
+      throw error;
+    }
+    console.error(
+      "malware scan unavailable — document stored WITHOUT a virus scan (ALLOW_UNSCANNED_UPLOADS=true)",
+      { tenantId: session.tenantId, filename: file.name },
+      error,
+    );
   }
 
   const normalized = await normalizeUpload(originalBytes, detected.mime);
